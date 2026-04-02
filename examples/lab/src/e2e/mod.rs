@@ -1,6 +1,5 @@
 use bevy::{camera::Projection, prelude::*};
 use bevy_enhanced_input::prelude::EnhancedInputSystems;
-use saddle_camera_top_down_camera::{TopDownCamera, TopDownCameraRuntime};
 use saddle_bevy_e2e::{
     E2EPlugin, E2ESet,
     action::Action,
@@ -8,6 +7,7 @@ use saddle_bevy_e2e::{
     init_scenario,
     scenario::Scenario,
 };
+use saddle_camera_top_down_camera::{TopDownCamera, TopDownCameraRuntime};
 
 use crate::{LabCameraEntity, LabPrimaryTargetEntity, LabSecondaryTargetEntity};
 

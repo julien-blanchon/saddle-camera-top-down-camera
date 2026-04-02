@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 bevy = "0.18"
-bevy_enhanced_input = "0.12"
+bevy_enhanced_input = { workspace = true }
 saddle-camera-top-down-camera = { path = "../.." }
 
 [lints.clippy]

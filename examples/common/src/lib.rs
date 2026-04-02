@@ -73,6 +73,7 @@ impl Plugin for ExampleTopDownCameraControlsPlugin {
 pub fn apply_example_defaults(app: &mut App) {
     app.insert_resource(ClearColor(Color::srgb(0.045, 0.055, 0.085)));
 
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(timer) = auto_exit_from_env() {
         app.insert_resource(timer);
         app.add_systems(Update, auto_exit_after);

@@ -2,11 +2,10 @@ use saddle_camera_top_down_camera_example_common as common;
 #[cfg(feature = "e2e")]
 mod e2e;
 
-use bevy::{
-    prelude::*,
-    remote::{RemotePlugin, http::RemoteHttpPlugin},
-};
-#[cfg(feature = "brp")]
+use bevy::prelude::*;
+#[cfg(all(feature = "brp", not(target_arch = "wasm32")))]
+use bevy::remote::{RemotePlugin, http::RemoteHttpPlugin};
+#[cfg(all(feature = "brp", not(target_arch = "wasm32")))]
 use bevy_brp_extras::BrpExtrasPlugin;
 use saddle_camera_top_down_camera::{
     TopDownCamera, TopDownCameraPlugin, TopDownCameraRuntime, TopDownCameraSettings,
@@ -48,11 +47,11 @@ fn main() {
         }),
         TopDownCameraPlugin::default(),
         common::ExampleTopDownCameraControlsPlugin,
-        RemotePlugin::default(),
     ));
-    #[cfg(feature = "brp")]
-    app.add_plugins(BrpExtrasPlugin::with_http_plugin(
-        RemoteHttpPlugin::default(),
+    #[cfg(all(feature = "brp", not(target_arch = "wasm32")))]
+    app.add_plugins((
+        RemotePlugin::default(),
+        BrpExtrasPlugin::with_http_plugin(RemoteHttpPlugin::default()),
     ));
     #[cfg(feature = "e2e")]
     app.add_plugins(e2e::TopDownCameraLabE2EPlugin);
