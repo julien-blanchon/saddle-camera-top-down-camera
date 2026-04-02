@@ -93,7 +93,10 @@ fn setup(
         0.4,
         16.0,
         TopDownCameraSettings {
-            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(58.0_f32.to_radians(), 16.0),
+            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
+                58.0_f32.to_radians(),
+                16.0,
+            ),
             dead_zone: Vec2::new(3.4, 2.2),
             zoom_min: 10.0,
             zoom_max: 24.0,

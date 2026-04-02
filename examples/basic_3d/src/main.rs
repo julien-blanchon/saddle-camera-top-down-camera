@@ -60,7 +60,10 @@ fn setup(
         0.3,
         18.0,
         TopDownCameraSettings {
-            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(60.0_f32.to_radians(), 18.0),
+            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
+                60.0_f32.to_radians(),
+                18.0,
+            ),
             dead_zone: Vec2::new(3.8, 2.6),
             damping: saddle_camera_top_down_camera::TopDownCameraDamping {
                 planar_x: 8.0,

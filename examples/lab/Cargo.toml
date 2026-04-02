@@ -21,3 +21,4 @@ saddle-camera-top-down-camera-example-common = { path = "../common" }
 too_many_arguments = "allow"
 type_complexity = "allow"
 nonstandard_macro_braces = "warn"
+collapsible_if = "allow"

@@ -134,7 +134,10 @@ fn setup(
         0.45,
         1.0,
         TopDownCameraSettings {
-            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(58.0_f32.to_radians(), 22.0),
+            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
+                58.0_f32.to_radians(),
+                22.0,
+            ),
             dead_zone: Vec2::new(3.4, 2.3),
             bias: Vec2::new(0.0, -0.2),
             bounds: Some(bounds),

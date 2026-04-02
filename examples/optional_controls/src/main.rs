@@ -1,7 +1,9 @@
 use saddle_camera_top_down_camera_example_common as common;
 
 use bevy::prelude::*;
-use saddle_camera_top_down_camera::{TopDownCameraPlugin, TopDownCameraSettings, TopDownCameraTarget};
+use saddle_camera_top_down_camera::{
+    TopDownCameraPlugin, TopDownCameraSettings, TopDownCameraTarget,
+};
 
 fn main() {
     let mut app = App::new();
@@ -66,7 +68,10 @@ fn setup(
         0.4,
         16.0,
         TopDownCameraSettings {
-            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(58.0_f32.to_radians(), 18.0),
+            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
+                58.0_f32.to_radians(),
+                18.0,
+            ),
             dead_zone: Vec2::new(3.6, 2.4),
             bias: Vec2::new(0.0, -0.2),
             zoom_min: 8.0,
@@ -84,6 +89,10 @@ fn setup(
         .entity(camera)
         .insert(saddle_camera_top_down_camera::TopDownCamera {
             tracked_target: Some(target_a),
-            ..saddle_camera_top_down_camera::TopDownCamera::looking_at_3d(common::EXAMPLE_3D_ANCHOR, 0.4, 16.0)
+            ..saddle_camera_top_down_camera::TopDownCamera::looking_at_3d(
+                common::EXAMPLE_3D_ANCHOR,
+                0.4,
+                16.0,
+            )
         });
 }
