@@ -5,6 +5,7 @@ members = [
     "basic_3d",
     "bounds",
     "target_switching",
+    "soft_zone_framing",
     "optional_controls",
     "lab",
 ]

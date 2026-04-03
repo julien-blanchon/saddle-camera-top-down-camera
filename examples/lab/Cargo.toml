@@ -16,6 +16,7 @@ saddle-bevy-e2e = { git = "https://github.com/julien-blanchon/saddle-bevy-e2e", 
 bevy_enhanced_input = { workspace = true }
 saddle-camera-top-down-camera = { path = "../.." }
 saddle-camera-top-down-camera-example-common = { path = "../common" }
+saddle-pane = { git = "https://github.com/julien-blanchon/saddle-pane" }
 
 [lints.clippy]
 too_many_arguments = "allow"

@@ -111,6 +111,7 @@ impl Default for TopDownCameraDamping {
 pub struct TopDownCameraSettings {
     pub mode: TopDownCameraMode,
     pub dead_zone: Vec2,
+    pub soft_zone: Vec2,
     pub bias: Vec2,
     pub damping: TopDownCameraDamping,
     pub bounds: Option<TopDownCameraBounds>,
@@ -143,6 +144,7 @@ impl Default for TopDownCameraSettings {
         Self {
             mode: TopDownCameraMode::default(),
             dead_zone: Vec2::new(96.0, 72.0),
+            soft_zone: Vec2::new(96.0, 72.0),
             bias: Vec2::ZERO,
             damping: TopDownCameraDamping::default(),
             bounds: None,

@@ -1,16 +1,13 @@
 [package]
-name = "saddle-camera-top-down-camera-example-common"
+name = "saddle-camera-top-down-camera-example-soft-zone-framing"
 version = "0.1.0"
 edition = "2024"
 publish = false
 
 [dependencies]
 bevy = "0.18"
-bevy_enhanced_input = { workspace = true }
-bevy_flair = "0.7"
-bevy_input_focus = "0.18"
-bevy_ui_widgets = "0.18"
 saddle-camera-top-down-camera = { path = "../.." }
+saddle-camera-top-down-camera-example-common = { path = "../common" }
 saddle-pane = { git = "https://github.com/julien-blanchon/saddle-pane" }
 
 [lints.clippy]

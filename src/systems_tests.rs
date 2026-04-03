@@ -161,6 +161,31 @@ fn camera_moves_only_the_excess_distance_after_leaving_dead_zone() {
 }
 
 #[test]
+fn soft_zone_reduces_recentering_inside_outer_frame() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins)
+        .add_plugins(TopDownCameraPlugin::always_on(Update));
+
+    let camera = spawn_2d_camera(
+        &mut app,
+        TopDownCameraSettings {
+            dead_zone: Vec2::new(100.0, 100.0),
+            soft_zone: Vec2::new(180.0, 180.0),
+            ..default()
+        },
+    );
+    spawn_target(&mut app, Vec3::new(78.0, 0.0, 0.0), 1);
+    start(&mut app);
+
+    let camera = app
+        .world()
+        .get::<TopDownCamera>(camera)
+        .expect("camera exists");
+    assert!(camera.target_anchor.x > 0.0);
+    assert!(camera.target_anchor.x < 28.0);
+}
+
+#[test]
 fn follow_can_be_suspended_without_losing_manual_camera_state() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins)

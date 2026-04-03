@@ -12,6 +12,7 @@ fn main() {
     let mut app = App::new();
     common::apply_example_defaults(&mut app);
     app.add_plugins((DefaultPlugins, TopDownCameraPlugin::default()));
+    common::install_pane(&mut app);
     app.add_systems(Startup, setup);
     app.add_systems(
         Update,
@@ -48,21 +49,28 @@ fn setup(
         },
     ));
 
+    let camera_settings = TopDownCameraSettings {
+        dead_zone: Vec2::new(180.0, 140.0),
+        soft_zone: Vec2::new(280.0, 220.0),
+        damping: saddle_camera_top_down_camera::TopDownCameraDamping {
+            planar_x: 7.0,
+            planar_y: 7.0,
+            ..default()
+        },
+        ..TopDownCameraSettings::flat_2d(999.0)
+    };
+
     common::spawn_camera_2d(
         &mut commands,
         "Top Down Camera",
         Vec3::ZERO,
         1.0,
-        TopDownCameraSettings {
-            dead_zone: Vec2::new(180.0, 140.0),
-            damping: saddle_camera_top_down_camera::TopDownCameraDamping {
-                planar_x: 7.0,
-                planar_y: 7.0,
-                ..default()
-            },
-            ..TopDownCameraSettings::flat_2d(999.0)
-        },
+        camera_settings.clone(),
         false,
+    );
+    common::queue_example_pane(
+        &mut commands,
+        common::ExampleTopDownPane::from_setup(&camera_settings, 1.0, 0.0, true, false),
     );
 }
 

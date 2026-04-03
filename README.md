@@ -9,6 +9,7 @@ The crate solves the generic follow-framing problem for 2D and near-top-down 3D 
 - 2D action-adventure and survivors-style follow cameras
 - angled 3D top-down or isometric-style follow cameras
 - dead-zone framing that avoids camera jitter on small target motion
+- optional soft-zone framing that gently recenters before the camera reaches a hard follow response
 - smooth follow with per-axis planar damping plus separate height, yaw, and zoom damping
 - orthographic zoom, plus perspective 3D distance zoom
 - runtime target swapping and crate-local BRP/E2E verification
@@ -67,7 +68,7 @@ For always-on tools and examples, `TopDownCameraPlugin::always_on(Update)` is th
 | `TopDownCameraPlugin` | Registers the runtime with injectable activate, deactivate, and update schedules |
 | `TopDownCameraSystems` | Public ordering hooks: `ResolveTarget`, `ComputeGoal`, `ApplySmoothing`, `SyncTransform`, `SyncProjection`, `DebugDraw` |
 | `TopDownCamera` | Desired camera state: target anchor, yaw, zoom, explicit tracked target, follow toggle, snap requests |
-| `TopDownCameraSettings` | Tuning surface for mode, dead zone, framing bias, damping, bounds, and zoom limits |
+| `TopDownCameraSettings` | Tuning surface for mode, dead zone, soft zone, framing bias, damping, bounds, and zoom limits |
 | `TopDownCameraTarget` | Follow candidate marker with priority, anchor offset, optional velocity look-ahead, and enable flag |
 | `TopDownCameraRuntime` | Smoothed runtime state plus the active target, tracked point, and current anchor |
 | `TopDownCameraBounds` | Center-only planar bounds clamp for the camera anchor |
@@ -83,6 +84,16 @@ The dead zone is defined in camera-local planar units, not normalized screen fra
 While the tracked point stays inside that rectangle, the camera anchor does not move. Once the tracked point leaves the rectangle, the camera goal moves only by the excess needed to place the target back on the dead-zone edge.
 
 This makes the solve projection-agnostic and reusable across 2D and 3D. The tradeoff is that the dead zone is not expressed directly in pixels or viewport percentages.
+
+## Soft Zone Semantics
+
+`soft_zone` is an optional outer framing band that sits outside the dead zone:
+
+- when `soft_zone == dead_zone`, the solve keeps the original dead-zone-only behavior
+- when the target leaves the dead zone but stays inside the soft zone, the camera recenters only partially
+- once the target reaches the outer edge, the solve applies the full dead-zone correction
+
+This mirrors the common “dead zone + soft follow” pattern from action-adventure and ARPG cameras while keeping the solve in planar world units.
 
 ## Zoom Semantics
 
@@ -116,10 +127,11 @@ Rotation lock is achieved by leaving `TopDownCamera.target_yaw` unchanged. `Flat
 
 | Example | Purpose | Run |
 | --- | --- | --- |
-| `basic_2d` | Minimal 2D orthographic follow with a centered dead zone | `cargo run -p saddle-camera-top-down-camera-example-basic-2d` |
-| `basic_3d` | Perspective `Camera3d` follow with pitch, yaw, and velocity look-ahead | `cargo run -p saddle-camera-top-down-camera-example-basic-3d` |
-| `bounds` | 2D center-bounds clamp with debug gizmos | `cargo run -p saddle-camera-top-down-camera-example-bounds` |
-| `target_switching` | Explicit runtime retargeting between two actors | `cargo run -p saddle-camera-top-down-camera-example-target-switching` |
+| `basic_2d` | 2D arena follow with dead-zone / soft-zone tuning exposed through `saddle-pane` | `cargo run -p saddle-camera-top-down-camera-example-basic-2d` |
+| `basic_3d` | Perspective `Camera3d` follow with pitch, yaw, and zoom surfaced live in `saddle-pane` | `cargo run -p saddle-camera-top-down-camera-example-basic-3d` |
+| `bounds` | 2D center-bounds clamp with debug gizmos and live framing controls | `cargo run -p saddle-camera-top-down-camera-example-bounds` |
+| `target_switching` | Explicit runtime retargeting between two actors while the pane edits framing in real time | `cargo run -p saddle-camera-top-down-camera-example-target-switching` |
+| `soft_zone_framing` | Dedicated soft-zone showcase for the new partial recentering behavior | `cargo run -p saddle-camera-top-down-camera-example-soft-zone-framing` |
 | `optional_controls` | `bevy_enhanced_input` bridge that moves the target and adjusts camera yaw and zoom | `cargo run -p saddle-camera-top-down-camera-example-optional-controls` |
 
 ## Workspace Lab

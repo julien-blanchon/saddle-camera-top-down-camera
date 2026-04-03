@@ -17,11 +17,36 @@ fn dead_zone_correction_returns_excess_distance() {
 }
 
 #[test]
+fn soft_zone_correction_stays_zero_inside_dead_zone() {
+    assert_eq!(
+        soft_zone_correction(
+            Vec2::new(12.0, -8.0),
+            Vec2::new(20.0, 20.0),
+            Vec2::new(48.0, 48.0)
+        ),
+        Vec2::ZERO
+    );
+}
+
+#[test]
+fn soft_zone_correction_gently_recenters_before_outer_edge() {
+    let correction = soft_zone_correction(
+        Vec2::new(78.0, 0.0),
+        Vec2::new(50.0, 50.0),
+        Vec2::new(90.0, 90.0),
+    );
+    assert!(correction.x > 0.0);
+    assert!(correction.x < 28.0);
+    assert_eq!(correction.y, 0.0);
+}
+
+#[test]
 fn solve_anchor_goal_clamps_planar_bounds() {
     let goal = solve_anchor_goal(
         Vec3::ZERO,
         Vec3::new(90.0, 20.0, 0.0),
         Vec2::ZERO,
+        Vec2::splat(20.0),
         Vec2::splat(20.0),
         Some(TopDownCameraBounds {
             min: Vec2::new(-8.0, -6.0),

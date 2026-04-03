@@ -58,6 +58,36 @@ pub(crate) fn dead_zone_correction(relative: Vec2, dead_zone_half: Vec2) -> Vec2
     )
 }
 
+pub(crate) fn soft_zone_correction(
+    relative: Vec2,
+    dead_zone_half: Vec2,
+    soft_zone_half: Vec2,
+) -> Vec2 {
+    Vec2::new(
+        soft_zone_correction_axis(relative.x, dead_zone_half.x, soft_zone_half.x),
+        soft_zone_correction_axis(relative.y, dead_zone_half.y, soft_zone_half.y),
+    )
+}
+
+fn soft_zone_correction_axis(value: f32, dead_half: f32, soft_half: f32) -> f32 {
+    let sign = value.signum();
+    let distance = value.abs();
+    let dead_half = dead_half.max(0.0);
+    let soft_half = soft_half.max(dead_half);
+
+    if distance <= dead_half {
+        return 0.0;
+    }
+
+    let full_correction = distance - dead_half;
+    if soft_half <= dead_half + f32::EPSILON {
+        return sign * full_correction;
+    }
+
+    let blend = ((distance - dead_half) / (soft_half - dead_half)).clamp(0.0, 1.0);
+    sign * full_correction * blend
+}
+
 pub(crate) fn clamp_zoom(value: f32, min: f32, max: f32) -> f32 {
     value.clamp(min.min(max), max.max(min))
 }
@@ -78,6 +108,7 @@ pub(crate) fn solve_anchor_goal(
     tracked_point: Vec3,
     bias: Vec2,
     dead_zone_size: Vec2,
+    soft_zone_size: Vec2,
     bounds: Option<TopDownCameraBounds>,
     mode: TopDownCameraMode,
     yaw: f32,
@@ -86,7 +117,11 @@ pub(crate) fn solve_anchor_goal(
     let current_planar = frame.project_point(Vec3::ZERO, current_anchor);
     let tracked_planar = frame.project_point(Vec3::ZERO, tracked_point);
     let relative = tracked_planar - current_planar - bias;
-    let correction = dead_zone_correction(relative, dead_zone_size * 0.5);
+    let correction = if soft_zone_size.cmple(dead_zone_size).all() {
+        dead_zone_correction(relative, dead_zone_size * 0.5)
+    } else {
+        soft_zone_correction(relative, dead_zone_size * 0.5, soft_zone_size * 0.5)
+    };
     let unclamped_goal = current_anchor + frame.planar_offset(correction);
 
     match mode {

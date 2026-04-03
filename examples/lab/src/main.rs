@@ -48,6 +48,7 @@ fn main() {
         TopDownCameraPlugin::default(),
         common::ExampleTopDownCameraControlsPlugin,
     ));
+    common::install_pane(&mut app);
     #[cfg(all(feature = "brp", not(target_arch = "wasm32")))]
     app.add_plugins((
         RemotePlugin::default(),
@@ -126,28 +127,35 @@ fn setup(
         },
     ));
 
+    let camera_settings = TopDownCameraSettings {
+        mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
+            58.0_f32.to_radians(),
+            22.0,
+        ),
+        dead_zone: Vec2::new(3.4, 2.3),
+        soft_zone: Vec2::new(5.8, 3.9),
+        bias: Vec2::new(0.0, -0.2),
+        bounds: Some(bounds),
+        zoom_min: 0.65,
+        zoom_max: 1.9,
+        zoom_speed: 0.75,
+        ..default()
+    };
+
     let camera = common::spawn_camera_3d_orthographic(
         &mut commands,
         "Top Down Camera",
         common::EXAMPLE_3D_ANCHOR,
         0.45,
         1.0,
-        TopDownCameraSettings {
-            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
-                58.0_f32.to_radians(),
-                22.0,
-            ),
-            dead_zone: Vec2::new(3.4, 2.3),
-            bias: Vec2::new(0.0, -0.2),
-            bounds: Some(bounds),
-            zoom_min: 0.65,
-            zoom_max: 1.9,
-            zoom_speed: 0.75,
-            ..default()
-        },
+        camera_settings.clone(),
         true,
     );
     common::attach_camera_controls(&mut commands, camera);
+    common::queue_example_pane(
+        &mut commands,
+        common::ExampleTopDownPane::from_setup(&camera_settings, 1.0, 0.45, true, true),
+    );
 
     commands.entity(camera).insert(TopDownCamera {
         tracked_target: Some(primary),

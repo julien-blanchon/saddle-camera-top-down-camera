@@ -13,6 +13,7 @@ fn main() {
         TopDownCameraPlugin::default(),
         common::ExampleTopDownCameraControlsPlugin,
     ));
+    common::install_pane(&mut app);
     app.insert_resource(common::ExampleTargetCycle::default());
     app.add_systems(Startup, setup);
     app.run();
@@ -61,29 +62,36 @@ fn setup(
         ..default()
     });
 
+    let camera_settings = TopDownCameraSettings {
+        mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
+            58.0_f32.to_radians(),
+            18.0,
+        ),
+        dead_zone: Vec2::new(3.6, 2.4),
+        soft_zone: Vec2::new(6.0, 4.0),
+        bias: Vec2::new(0.0, -0.2),
+        zoom_min: 8.0,
+        zoom_max: 26.0,
+        zoom_speed: 1.5,
+        ..default()
+    };
+
     let camera = common::spawn_camera_3d_perspective(
         &mut commands,
         "Top Down Camera",
         common::EXAMPLE_3D_ANCHOR,
         0.4,
         16.0,
-        TopDownCameraSettings {
-            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
-                58.0_f32.to_radians(),
-                18.0,
-            ),
-            dead_zone: Vec2::new(3.6, 2.4),
-            bias: Vec2::new(0.0, -0.2),
-            zoom_min: 8.0,
-            zoom_max: 26.0,
-            zoom_speed: 1.5,
-            ..default()
-        },
+        camera_settings.clone(),
         true,
     );
 
     common::attach_target_controls(&mut commands, target_a);
     common::attach_camera_controls(&mut commands, camera);
+    common::queue_example_pane(
+        &mut commands,
+        common::ExampleTopDownPane::from_setup(&camera_settings, 16.0, 0.4, true, true),
+    );
     cycle.entities = vec![target_a, target_b];
     commands
         .entity(camera)

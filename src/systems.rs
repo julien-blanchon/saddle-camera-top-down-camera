@@ -104,6 +104,7 @@ pub(crate) fn resolve_follow_targets(
                 tracked_point,
                 settings.bias,
                 settings.dead_zone,
+                settings.soft_zone,
                 settings.bounds,
                 settings.mode,
                 yaw,
@@ -211,6 +212,7 @@ pub(crate) fn clamp_programmatic_goal(
             camera.target_anchor = solve_anchor_goal(
                 camera.target_anchor,
                 camera.target_anchor,
+                Vec2::ZERO,
                 Vec2::ZERO,
                 Vec2::ZERO,
                 settings.bounds,

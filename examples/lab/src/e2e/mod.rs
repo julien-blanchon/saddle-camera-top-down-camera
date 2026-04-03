@@ -7,7 +7,7 @@ use saddle_bevy_e2e::{
     init_scenario,
     scenario::Scenario,
 };
-use saddle_camera_top_down_camera::{TopDownCamera, TopDownCameraRuntime};
+use saddle_camera_top_down_camera::{TopDownCamera, TopDownCameraRuntime, TopDownCameraSettings};
 
 use crate::{LabCameraEntity, LabPrimaryTargetEntity, LabSecondaryTargetEntity};
 
@@ -16,6 +16,10 @@ pub struct TopDownCameraLabE2EPlugin;
 impl Plugin for TopDownCameraLabE2EPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(E2EPlugin);
+        app.add_systems(
+            Update,
+            enforce_authored_lab_defaults.before(E2ESet),
+        );
         app.configure_sets(
             Update,
             (
@@ -39,6 +43,50 @@ impl Plugin for TopDownCameraLabE2EPlugin {
                     list_scenarios()
                 );
             }
+        }
+    }
+}
+
+fn enforce_authored_lab_defaults(
+    pane: Option<ResMut<saddle_camera_top_down_camera_example_common::ExampleTopDownPane>>,
+    mut cameras: Query<(&mut TopDownCamera, &mut TopDownCameraSettings)>,
+) {
+    let authored_dead_zone = Vec2::new(3.4, 2.3);
+    let authored_soft_zone = Vec2::new(5.8, 3.9);
+    let authored_bias = Vec2::new(0.0, -0.2);
+
+    if let Some(mut pane) = pane {
+        pane.follow_enabled = true;
+        pane.debug_gizmos = true;
+        pane.dead_zone_x = authored_dead_zone.x;
+        pane.dead_zone_y = authored_dead_zone.y;
+        pane.soft_zone_x = authored_soft_zone.x;
+        pane.soft_zone_y = authored_soft_zone.y;
+        pane.bias_x = authored_bias.x;
+        pane.bias_y = authored_bias.y;
+        pane.zoom_speed = 0.75;
+        pane.planar_damping = 9.0;
+        pane.zoom_damping = 12.0;
+        pane.yaw_damping = 10.0;
+        pane.yaw_radians = 0.45;
+        pane.pitch_degrees = 58.0;
+    }
+
+    for (mut camera, mut settings) in &mut cameras {
+        camera.follow_enabled = true;
+        camera.target_yaw = 0.45;
+
+        settings.dead_zone = authored_dead_zone;
+        settings.soft_zone = authored_soft_zone;
+        settings.bias = authored_bias;
+        settings.zoom_speed = 0.75;
+        if let saddle_camera_top_down_camera::TopDownCameraMode::Tilted3d {
+            pitch,
+            orthographic_distance,
+        } = &mut settings.mode
+        {
+            *pitch = 58.0_f32.to_radians();
+            *orthographic_distance = 22.0;
         }
     }
 }
@@ -77,6 +125,7 @@ fn scenario_by_name(name: &str) -> Option<Scenario> {
         "top_down_camera_follow" => Some(build_follow()),
         "top_down_camera_bounds" => Some(build_bounds()),
         "top_down_camera_zoom" => Some(build_zoom()),
+        "top_down_camera_soft_zone" => Some(build_soft_zone()),
         "top_down_camera_target_switch" => Some(build_target_switch()),
         _ => None,
     }
@@ -89,6 +138,7 @@ fn list_scenarios() -> Vec<&'static str> {
         "top_down_camera_follow",
         "top_down_camera_bounds",
         "top_down_camera_zoom",
+        "top_down_camera_soft_zone",
         "top_down_camera_target_switch",
     ]
 }
@@ -295,6 +345,84 @@ fn build_zoom() -> Scenario {
         ))
         .then(assertions::log_summary("top_down_camera_zoom summary"))
         .then(Action::Screenshot("top_down_camera_zoom_after".into()))
+        .then(Action::WaitFrames(1))
+        .build()
+}
+
+fn build_soft_zone() -> Scenario {
+    Scenario::builder("top_down_camera_soft_zone")
+        .description("Temporarily neutralize look-ahead, place the tracked hero just beyond the dead zone but within the soft zone, then assert the camera applies only a partial correction.")
+        .then(Action::WaitFrames(40))
+        .then(Action::Custom(Box::new(|world: &mut World| {
+            store_baseline(world);
+            let Some(target) = primary_target_entity(world) else {
+                return;
+            };
+            if let Some(mut camera_target) = world.get_mut::<saddle_camera_top_down_camera::TopDownCameraTarget>(target) {
+                camera_target.look_ahead_time = Vec2::ZERO;
+                camera_target.max_look_ahead = Vec2::ZERO;
+            }
+            if let Some(mut transform) = world.get_mut::<Transform>(target) {
+                transform.translation = Vec3::new(2.4, 0.75, 0.0);
+            }
+        })))
+        .then(Action::Screenshot("top_down_camera_soft_zone_before".into()))
+        .then(Action::WaitFrames(18))
+        .then(assertions::custom(
+            "soft zone applies only a partial correction",
+            Box::new(|world: &World| {
+                let Some(baseline) = world.get_resource::<RuntimeBaseline>().copied() else {
+                    return false;
+                };
+                let Some(runtime) = runtime(world) else {
+                    return false;
+                };
+                let Some(camera_entity) = camera_entity(world) else {
+                    return false;
+                };
+                let Some(settings) = world.get::<TopDownCameraSettings>(camera_entity) else {
+                    return false;
+                };
+                let Some(target) = primary_target_entity(world) else {
+                    return false;
+                };
+                let Some(transform) = world.get::<Transform>(target) else {
+                    return false;
+                };
+
+                let (axis_x, axis_y) = match settings.mode {
+                    saddle_camera_top_down_camera::TopDownCameraMode::Flat2d { .. } => {
+                        (Vec3::X, Vec3::Y)
+                    }
+                    saddle_camera_top_down_camera::TopDownCameraMode::Tilted3d { .. } => {
+                        let rotation = Quat::from_rotation_y(runtime.yaw);
+                        (rotation * Vec3::X, rotation * Vec3::NEG_Z)
+                    }
+                };
+
+                let relative_to_goal = runtime.tracked_point - runtime.goal_anchor;
+                let residual = Vec2::new(
+                    relative_to_goal.dot(axis_x),
+                    relative_to_goal.dot(axis_y),
+                ) - settings.bias;
+                let dead_half = settings.dead_zone * 0.5;
+                let soft_half = settings.soft_zone.max(settings.dead_zone) * 0.5;
+                let goal_shift = runtime.goal_anchor.distance(baseline.follow_anchor);
+
+                transform.translation.x > 2.3
+                    && goal_shift > 0.15
+                    && residual.x.abs() > dead_half.x + 0.05
+                    && residual.x.abs() < soft_half.x - 0.05
+                    && residual.y.abs() < soft_half.y - 0.05
+                    && runtime.follow_anchor.distance(runtime.goal_anchor) > 0.02
+                    && runtime.follow_anchor.distance(runtime.goal_anchor) < 0.25
+            }),
+        ))
+        .then(assertions::log_summary("top_down_camera_soft_zone summary"))
+        .then(inspect::dump_component_json::<TopDownCameraRuntime>(
+            "top_down_camera_soft_zone_runtime",
+        ))
+        .then(Action::Screenshot("top_down_camera_soft_zone_after".into()))
         .then(Action::WaitFrames(1))
         .build()
 }

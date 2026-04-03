@@ -12,7 +12,7 @@ The crate follows the same split used by the other shared camera crates in this 
 The per-frame flow is:
 
 1. **ResolveTarget**
-   Track target motion, compute optional look-ahead, select the active target, and solve a dead-zone-corrected anchor goal.
+   Track target motion, compute optional look-ahead, select the active target, and solve a dead-zone / soft-zone corrected anchor goal.
 2. **ComputeGoal**
    Clamp programmatic anchor and zoom requests to bounds and min or max ranges.
 3. **ApplySmoothing**
@@ -24,12 +24,13 @@ The per-frame flow is:
 6. **DebugDraw**
    Optionally draw dead zone, bounds, anchor, and tracked-point gizmos.
 
-## Dead Zone And Smoothing
+## Dead Zone, Soft Zone, And Smoothing
 
 The dead zone solve runs against the current rendered anchor, not the desired anchor. That detail matters:
 
 - if the target stays inside the dead zone, the camera goal does not move
-- when the target leaves the dead zone, the goal moves only by the excess distance
+- when the target leaves the dead zone but stays inside the soft zone, the goal moves only part of the excess distance
+- once the target reaches the outer edge, the goal moves by the full dead-zone excess
 - smoothing then decides how fast the rendered camera catches up to that new goal
 
 This avoids the common bug where the goal drifts every frame and effectively drags the dead zone along with it.

@@ -17,6 +17,7 @@
 | --- | --- | --- | --- | --- |
 | `mode` | `TopDownCameraMode` | `Flat2d { depth: 1000.0 }` | `Flat2d` or `Tilted3d` | Selects the view-mode transform solve. |
 | `dead_zone` | `Vec2` | `(96.0, 72.0)` | Non-negative size | Size of the rectangular dead zone in camera-local planar units. |
+| `soft_zone` | `Vec2` | `(96.0, 72.0)` | Per-axis value greater than or equal to `dead_zone` recommended | Optional outer framing band that blends from “no motion” into full recentering. |
 | `bias` | `Vec2` | `Vec2::ZERO` | Any finite value | Offsets the point the target is held around inside the dead zone. |
 | `damping` | `TopDownCameraDamping` | See below | Non-negative decay rates | Controls smoothing for planar motion, height, zoom, and yaw. |
 | `bounds` | `Option<TopDownCameraBounds>` | `None` | `None` or finite min/max pair | Center-only clamp for the camera anchor on the active follow plane. |
@@ -32,6 +33,14 @@
 - height = `dead_zone.y`
 
 The solver internally uses half-extents when checking whether the tracked point lies outside the rectangle.
+
+### Soft Zone Semantics
+
+`soft_zone` uses the same planar units as `dead_zone`:
+
+- matching `dead_zone` preserves the legacy behavior
+- larger values add a gentler recentering band outside the dead zone
+- values smaller than `dead_zone` are treated as if they matched `dead_zone`
 
 ### Bias Semantics
 

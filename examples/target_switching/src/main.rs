@@ -28,6 +28,7 @@ fn main() {
     let mut app = App::new();
     common::apply_example_defaults(&mut app);
     app.add_plugins((DefaultPlugins, TopDownCameraPlugin::default()));
+    common::install_pane(&mut app);
     app.insert_resource(SwitchTimer(Timer::from_seconds(2.2, TimerMode::Repeating)));
     app.add_systems(Startup, setup);
     app.add_systems(
@@ -86,27 +87,34 @@ fn setup(
         },
     ));
 
+    let camera_settings = TopDownCameraSettings {
+        mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
+            58.0_f32.to_radians(),
+            16.0,
+        ),
+        dead_zone: Vec2::new(3.4, 2.2),
+        soft_zone: Vec2::new(5.6, 3.7),
+        zoom_min: 10.0,
+        zoom_max: 24.0,
+        zoom_speed: 1.2,
+        ..default()
+    };
+
     let camera = common::spawn_camera_3d_perspective(
         &mut commands,
         "Top Down Camera",
         common::EXAMPLE_3D_ANCHOR,
         0.4,
         16.0,
-        TopDownCameraSettings {
-            mode: saddle_camera_top_down_camera::TopDownCameraMode::tilted_3d(
-                58.0_f32.to_radians(),
-                16.0,
-            ),
-            dead_zone: Vec2::new(3.4, 2.2),
-            zoom_min: 10.0,
-            zoom_max: 24.0,
-            zoom_speed: 1.2,
-            ..default()
-        },
+        camera_settings.clone(),
         true,
     );
     commands.insert_resource(CameraEntity(camera));
     commands.insert_resource(TargetPair { left, right });
+    common::queue_example_pane(
+        &mut commands,
+        common::ExampleTopDownPane::from_setup(&camera_settings, 16.0, 0.4, true, true),
+    );
 
     commands.entity(camera).insert(TopDownCamera {
         tracked_target: Some(left),
