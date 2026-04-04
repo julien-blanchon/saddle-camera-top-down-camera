@@ -25,9 +25,7 @@ pub(crate) fn draw_debug_gizmos(
                     settings.soft_zone.max(settings.dead_zone),
                     match settings.mode {
                         TopDownCameraMode::Flat2d { .. } => Color::srgba(0.35, 0.72, 0.98, 0.55),
-                        TopDownCameraMode::Tilted3d { .. } => {
-                            Color::srgba(0.28, 0.66, 0.96, 0.55)
-                        }
+                        TopDownCameraMode::Tilted3d { .. } => Color::srgba(0.28, 0.66, 0.96, 0.55),
                     },
                 );
             }
