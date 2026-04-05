@@ -9,7 +9,6 @@ use bevy_enhanced_input::prelude::{
 use bevy_flair::prelude::InlineStyle;
 use saddle_camera_top_down_camera::{
     TopDownCamera, TopDownCameraDebug, TopDownCameraMode, TopDownCameraSettings,
-    TopDownCameraSystems,
 };
 use saddle_pane::prelude::*;
 
@@ -236,10 +235,6 @@ pub fn install_pane(app: &mut App) {
             sync_example_pane,
         )
             .chain(),
-    )
-    .add_systems(
-        PostUpdate,
-        reflect_example_pane.after(TopDownCameraSystems::SyncProjection),
     );
 }
 
@@ -598,6 +593,7 @@ fn apply_move_input(
 fn apply_zoom_input(
     event: On<Fire<ExampleZoomAction>>,
     time: Res<Time>,
+    mut pane: ResMut<ExampleTopDownPane>,
     mut cameras: Query<(&TopDownCameraSettings, &mut TopDownCamera)>,
 ) {
     let Ok((settings, mut camera)) = cameras.get_mut(event.context) else {
@@ -605,11 +601,13 @@ fn apply_zoom_input(
     };
 
     camera.zoom -= event.value * settings.zoom_speed * 6.0 * time.delta_secs();
+    pane.zoom = camera.zoom.clamp(settings.zoom_min, settings.zoom_max);
 }
 
 fn apply_yaw_input(
     event: On<Fire<ExampleYawAction>>,
     time: Res<Time>,
+    mut pane: ResMut<ExampleTopDownPane>,
     mut cameras: Query<&mut TopDownCamera>,
 ) {
     let Ok(mut camera) = cameras.get_mut(event.context) else {
@@ -617,6 +615,7 @@ fn apply_yaw_input(
     };
 
     camera.target_yaw += event.value * 1.8 * time.delta_secs();
+    pane.yaw_radians = camera.target_yaw;
 }
 
 fn apply_target_switch(
@@ -714,7 +713,9 @@ fn sync_example_pane(
 
         camera.follow_enabled = effective_pane.follow_enabled;
         camera.target_yaw = effective_pane.yaw_radians;
-        camera.zoom = effective_pane.zoom.clamp(settings.zoom_min, settings.zoom_max);
+        camera.zoom = effective_pane
+            .zoom
+            .clamp(settings.zoom_min, settings.zoom_max);
 
         if effective_pane.debug_gizmos && debug.is_none() {
             commands
@@ -724,34 +725,4 @@ fn sync_example_pane(
             commands.entity(entity).remove::<TopDownCameraDebug>();
         }
     }
-}
-
-fn reflect_example_pane(
-    mut pane: ResMut<ExampleTopDownPane>,
-    cameras: Query<(&TopDownCamera, &TopDownCameraSettings, Option<&TopDownCameraDebug>)>,
-) {
-    let Some((camera, settings, debug)) = cameras.iter().next() else {
-        return;
-    };
-
-    let pitch_degrees = match settings.mode {
-        TopDownCameraMode::Flat2d { .. } => 60.0,
-        TopDownCameraMode::Tilted3d { pitch, .. } => pitch.to_degrees(),
-    };
-
-    pane.follow_enabled = camera.follow_enabled;
-    pane.debug_gizmos = debug.is_some();
-    pane.dead_zone_x = settings.dead_zone.x;
-    pane.dead_zone_y = settings.dead_zone.y;
-    pane.soft_zone_x = settings.soft_zone.x;
-    pane.soft_zone_y = settings.soft_zone.y;
-    pane.bias_x = settings.bias.x;
-    pane.bias_y = settings.bias.y;
-    pane.zoom = camera.zoom;
-    pane.zoom_speed = settings.zoom_speed;
-    pane.planar_damping = settings.damping.planar_x.max(settings.damping.planar_y);
-    pane.zoom_damping = settings.damping.zoom;
-    pane.yaw_damping = settings.damping.yaw;
-    pane.yaw_radians = camera.target_yaw;
-    pane.pitch_degrees = pitch_degrees;
 }

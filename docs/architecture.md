@@ -109,10 +109,27 @@ Order downstream systems around the public system sets:
 
 The examples intentionally move their targets before `ResolveTarget` for that reason.
 
+## Built-In Input Module
+
+The crate provides an optional `TopDownCameraInputPlugin` with a `TopDownCameraInput` component. This decouples the framing runtime from input handling — consumers can use it, replace it, or skip it entirely.
+
+The input module runs all systems `before(TopDownCameraSystems::ResolveTarget)` and covers:
+- keyboard panning (WASD/arrows, zoom-scaled)
+- mouse drag panning (pixel-to-world conversion for both 2D and 3D)
+- scroll wheel zoom with optional zoom-to-cursor
+- edge scrolling (proportional speed based on cursor distance from edge)
+- keyboard rotation (Q/E for yaw)
+- keyboard zoom (+/- keys)
+
+Input systems only query entities that have both `TopDownCameraInput` and `TopDownCamera`. Cameras without the input component are unaffected.
+
+## Bounds Soft Margin
+
+`TopDownCameraSettings::bounds_soft_margin` adds an exponential rubber-band feel to bounds clamping. When `> 0.0`, the camera is allowed to slightly overshoot the boundary but is pulled back with exponential falloff (`margin * (1 - e^(-overshoot/margin))`). This avoids the hard stop that can feel jarring in strategy or exploration games.
+
 ## Known Tradeoffs
 
 - parented targets should expose a dedicated anchor entity when same-frame accuracy matters
 - visible-extent confining is intentionally not part of v1
 - 2D mode keeps rotation locked to identity
-- the runtime owns framing only; input adapters live in examples or consumer code
 - target look-ahead uses an internally smoothed velocity estimate to reduce fixed-step jitter, but teleport-heavy games should still clamp look-ahead with `max_look_ahead`

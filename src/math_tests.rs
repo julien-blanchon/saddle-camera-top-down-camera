@@ -52,6 +52,7 @@ fn solve_anchor_goal_clamps_planar_bounds() {
             min: Vec2::new(-8.0, -6.0),
             max: Vec2::new(8.0, 6.0),
         }),
+        0.0,
         TopDownCameraMode::flat_2d(10.0),
         0.0,
     );

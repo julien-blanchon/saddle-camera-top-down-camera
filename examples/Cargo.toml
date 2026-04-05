@@ -7,6 +7,8 @@ members = [
     "target_switching",
     "soft_zone_framing",
     "optional_controls",
+    "strategy_game",
+    "arpg_camera",
     "lab",
 ]
 resolver = "3"

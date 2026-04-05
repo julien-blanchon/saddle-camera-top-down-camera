@@ -115,6 +115,11 @@ pub struct TopDownCameraSettings {
     pub bias: Vec2,
     pub damping: TopDownCameraDamping,
     pub bounds: Option<TopDownCameraBounds>,
+    /// Soft margin in world units around the bounds.
+    /// When greater than zero, the camera is gently pushed back with
+    /// exponential falloff instead of hard-clamped, creating a rubber-band
+    /// feel. Set to `0.0` (default) for the original hard-clamp behavior.
+    pub bounds_soft_margin: f32,
     pub zoom_min: f32,
     pub zoom_max: f32,
     pub zoom_speed: f32,
@@ -134,7 +139,7 @@ impl TopDownCameraSettings {
             zoom_min: 6.0,
             zoom_max: 36.0,
             zoom_speed: 2.0,
-            ..default()
+            ..Self::default()
         }
     }
 }
@@ -148,6 +153,7 @@ impl Default for TopDownCameraSettings {
             bias: Vec2::ZERO,
             damping: TopDownCameraDamping::default(),
             bounds: None,
+            bounds_soft_margin: 0.0,
             zoom_min: 0.5,
             zoom_max: 4.0,
             zoom_speed: 0.2,

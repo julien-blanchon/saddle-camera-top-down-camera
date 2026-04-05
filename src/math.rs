@@ -92,15 +92,40 @@ pub(crate) fn clamp_zoom(value: f32, min: f32, max: f32) -> f32 {
     value.clamp(min.min(max), max.max(min))
 }
 
-pub(crate) fn clamp_to_bounds(value: Vec2, bounds: Option<TopDownCameraBounds>) -> Vec2 {
+pub(crate) fn clamp_to_bounds(
+    value: Vec2,
+    bounds: Option<TopDownCameraBounds>,
+    soft_margin: f32,
+) -> Vec2 {
     let Some(bounds) = bounds else {
         return value;
     };
 
+    if soft_margin <= 0.0 {
+        return Vec2::new(
+            value.x.clamp(bounds.min.x, bounds.max.x),
+            value.y.clamp(bounds.min.y, bounds.max.y),
+        );
+    }
+
     Vec2::new(
-        value.x.clamp(bounds.min.x, bounds.max.x),
-        value.y.clamp(bounds.min.y, bounds.max.y),
+        soft_clamp_axis(value.x, bounds.min.x, bounds.max.x, soft_margin),
+        soft_clamp_axis(value.y, bounds.min.y, bounds.max.y, soft_margin),
     )
+}
+
+fn soft_clamp_axis(value: f32, min: f32, max: f32, margin: f32) -> f32 {
+    if value < min {
+        let overshoot = min - value;
+        let pull = margin * (1.0 - (-overshoot / margin).exp());
+        min - (margin - pull)
+    } else if value > max {
+        let overshoot = value - max;
+        let pull = margin * (1.0 - (-overshoot / margin).exp());
+        max + (margin - pull)
+    } else {
+        value
+    }
 }
 
 pub(crate) fn solve_anchor_goal(
@@ -110,6 +135,7 @@ pub(crate) fn solve_anchor_goal(
     dead_zone_size: Vec2,
     soft_zone_size: Vec2,
     bounds: Option<TopDownCameraBounds>,
+    bounds_soft_margin: f32,
     mode: TopDownCameraMode,
     yaw: f32,
 ) -> Vec3 {
@@ -126,11 +152,11 @@ pub(crate) fn solve_anchor_goal(
 
     match mode {
         TopDownCameraMode::Flat2d { .. } => {
-            let clamped = clamp_to_bounds(unclamped_goal.xy(), bounds);
+            let clamped = clamp_to_bounds(unclamped_goal.xy(), bounds, bounds_soft_margin);
             Vec3::new(clamped.x, clamped.y, current_anchor.z)
         }
         TopDownCameraMode::Tilted3d { .. } => {
-            let clamped = clamp_to_bounds(unclamped_goal.xz(), bounds);
+            let clamped = clamp_to_bounds(unclamped_goal.xz(), bounds, bounds_soft_margin);
             Vec3::new(clamped.x, tracked_point.y, clamped.y)
         }
     }

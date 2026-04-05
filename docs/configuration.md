@@ -21,6 +21,7 @@
 | `bias` | `Vec2` | `Vec2::ZERO` | Any finite value | Offsets the point the target is held around inside the dead zone. |
 | `damping` | `TopDownCameraDamping` | See below | Non-negative decay rates | Controls smoothing for planar motion, height, zoom, and yaw. |
 | `bounds` | `Option<TopDownCameraBounds>` | `None` | `None` or finite min/max pair | Center-only clamp for the camera anchor on the active follow plane. |
+| `bounds_soft_margin` | `f32` | `0.0` | Non-negative | Soft margin around bounds. `0.0` = hard clamp. `> 0.0` = exponential rubber-band falloff in world units. |
 | `zoom_min` | `f32` | `0.5` | Less than or equal to `zoom_max` | Lower zoom clamp. For perspective 3D this is minimum distance. |
 | `zoom_max` | `f32` | `4.0` | Greater than or equal to `zoom_min` | Upper zoom clamp. For perspective 3D this is maximum distance. |
 | `zoom_speed` | `f32` | `0.2` | Non-negative | Convenience tuning for example or consumer input adapters. The runtime itself does not read input. |
@@ -126,6 +127,32 @@ The crate smooths the sampled target velocity internally before applying look-ah
   the lower entity index wins for deterministic behavior
 - no valid target:
   the runtime keeps the existing desired anchor instead of inventing a new one
+
+## `TopDownCameraInput`
+
+Optional component for built-in input handling. Requires `TopDownCameraInputPlugin`.
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `keyboard_pan_enabled` | `bool` | `true` | Enable WASD / arrow key panning. |
+| `keyboard_pan_speed` | `f32` | `10.0` | Pan speed in world units per second. Scaled by zoom in `Flat2d`. |
+| `mouse_drag_enabled` | `bool` | `true` | Enable mouse drag panning. |
+| `mouse_drag_button` | `MouseButton` | `Middle` | Which button activates drag panning. |
+| `scroll_zoom_enabled` | `bool` | `true` | Enable scroll wheel zoom. |
+| `scroll_zoom_sensitivity` | `f32` | `0.15` | Zoom per scroll line (proportional to current zoom). |
+| `zoom_to_cursor` | `bool` | `true` | Zoom toward cursor position instead of screen center. |
+| `edge_scroll_enabled` | `bool` | `false` | Enable edge scrolling when cursor is near screen edges. |
+| `edge_scroll_margin` | `f32` | `30.0` | Edge zone width in pixels. |
+| `edge_scroll_speed` | `f32` | `8.0` | Edge scroll speed in world units per second. |
+| `keyboard_rotate_enabled` | `bool` | `true` | Enable Q/E keyboard rotation (`Tilted3d` only). |
+| `keyboard_rotate_speed` | `f32` | `1.8` | Rotation speed in radians per second. |
+| `keyboard_zoom_enabled` | `bool` | `true` | Enable +/- keyboard zoom. |
+| `keyboard_zoom_speed` | `f32` | `2.0` | Keyboard zoom speed in units per second. |
+
+### Presets
+
+- `TopDownCameraInput::strategy()` — edge scroll enabled, faster pan and zoom
+- `TopDownCameraInput::arpg()` — keyboard pan and mouse drag disabled, just zoom and rotate
 
 ## `TopDownCameraDebug`
 

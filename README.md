@@ -16,7 +16,6 @@ The crate solves the generic follow-framing problem for 2D and near-top-down 3D 
 
 ## What It Is Not For
 
-- a bundled input stack
 - gameplay-specific target selection rules
 - polygon or spline confiners
 - visible-extent bounds solving
@@ -73,6 +72,8 @@ For always-on tools and examples, `TopDownCameraPlugin::always_on(Update)` is th
 | `TopDownCameraRuntime` | Smoothed runtime state plus the active target, tracked point, and current anchor |
 | `TopDownCameraBounds` | Center-only planar bounds clamp for the camera anchor |
 | `TopDownCameraDebug` | Opt-in debug gizmos for dead zone, bounds, follow anchor, and tracked point |
+| `TopDownCameraInput` | Configuration component for built-in mouse, keyboard, and edge-scroll input handling |
+| `TopDownCameraInputPlugin` | Optional plugin that adds input processing for cameras with `TopDownCameraInput` |
 
 ## Dead Zone Semantics
 
@@ -113,13 +114,28 @@ For orthographic cameras, visible extents still depend on `OrthographicProjectio
 - `Flat2d`: bounds apply to the anchor on `XY`
 - `Tilted3d`: bounds apply to the anchor on `XZ`
 
+`TopDownCameraSettings::bounds_soft_margin` controls the clamping feel:
+- `0.0` (default): hard clamp at the boundary edge
+- `> 0.0`: exponential falloff that gently pushes the anchor back, creating a rubber-band feel
+
 The current implementation does not shrink bounds based on visible extents, so an orthographic camera can still show past the edge if its zoom scale is large enough. That tradeoff is deliberate for the first version and is documented here rather than hidden.
 
 ## Input Model
 
-The shared runtime crate does not own input. Consumers should mutate `TopDownCamera` directly or adapt their own input layer into it.
+The crate provides an optional `TopDownCameraInputPlugin` with a `TopDownCameraInput` component for built-in input handling. Attach `TopDownCameraInput` to any camera entity alongside `TopDownCamera` and `TopDownCameraSettings` to enable:
 
-The examples and lab include a small `bevy_enhanced_input` bridge, but that code lives outside the runtime crate so downstream games can swap it for their own bindings without forking the camera logic.
+- **Keyboard panning** (WASD / arrows) with zoom-scaled speed
+- **Mouse drag panning** (configurable button, default middle)
+- **Scroll wheel zoom** with optional zoom-to-cursor
+- **Edge scrolling** (camera moves when cursor is near screen edges)
+- **Keyboard rotation** (Q/E for yaw in `Tilted3d` mode)
+- **Keyboard zoom** (+/- keys)
+
+Two presets are provided: `TopDownCameraInput::strategy()` (edge scroll, fast pan, zoom-to-cursor) and `TopDownCameraInput::arpg()` (no manual pan or drag, just zoom and rotate).
+
+Consumers who need custom input handling can skip `TopDownCameraInputPlugin` and mutate `TopDownCamera` directly.
+
+The examples and lab also include a `bevy_enhanced_input` bridge for target movement and camera controls, but that code lives outside the runtime crate.
 
 Rotation lock is achieved by leaving `TopDownCamera.target_yaw` unchanged. `Flat2d` mode always locks rotation to identity; `Tilted3d` only rotates when a consumer mutates yaw.
 
@@ -133,6 +149,8 @@ Rotation lock is achieved by leaving `TopDownCamera.target_yaw` unchanged. `Flat
 | `target_switching` | Explicit runtime retargeting between two actors while the pane edits framing in real time | `cargo run -p saddle-camera-top-down-camera-example-target-switching` |
 | `soft_zone_framing` | Dedicated soft-zone showcase for the new partial recentering behavior | `cargo run -p saddle-camera-top-down-camera-example-soft-zone-framing` |
 | `optional_controls` | `bevy_enhanced_input` bridge that moves the target and adjusts camera yaw and zoom | `cargo run -p saddle-camera-top-down-camera-example-optional-controls` |
+| `strategy_game` | Strategy/RTS camera with edge scrolling, zoom-to-cursor, map bounds, and soft clamping | `cargo run -p saddle-camera-top-down-camera-example-strategy-game` |
+| `arpg_camera` | ARPG-style follow camera with character movement, look-ahead, and target switching | `cargo run -p saddle-camera-top-down-camera-example-arpg-camera` |
 
 ## Workspace Lab
 
@@ -150,6 +168,7 @@ cargo run -p saddle-camera-top-down-camera-lab --features e2e -- top_down_camera
 cargo run -p saddle-camera-top-down-camera-lab --features e2e -- top_down_camera_follow
 cargo run -p saddle-camera-top-down-camera-lab --features e2e -- top_down_camera_bounds
 cargo run -p saddle-camera-top-down-camera-lab --features e2e -- top_down_camera_zoom
+cargo run -p saddle-camera-top-down-camera-lab --features e2e -- top_down_camera_soft_zone
 cargo run -p saddle-camera-top-down-camera-lab --features e2e -- top_down_camera_target_switch
 ```
 

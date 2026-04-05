@@ -4974,6 +4974,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "saddle-camera-top-down-camera-example-arpg-camera"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "saddle-camera-top-down-camera",
+ "saddle-camera-top-down-camera-example-common",
+ "saddle-pane",
+]
+
+[[package]]
 name = "saddle-camera-top-down-camera-example-basic-2d"
 version = "0.1.0"
 dependencies = [
@@ -5028,6 +5038,16 @@ dependencies = [
 
 [[package]]
 name = "saddle-camera-top-down-camera-example-soft-zone-framing"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "saddle-camera-top-down-camera",
+ "saddle-camera-top-down-camera-example-common",
+ "saddle-pane",
+]
+
+[[package]]
+name = "saddle-camera-top-down-camera-example-strategy-game"
 version = "0.1.0"
 dependencies = [
  "bevy",

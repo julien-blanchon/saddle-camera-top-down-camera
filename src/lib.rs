@@ -1,5 +1,6 @@
 mod components;
 mod debug;
+pub mod input;
 mod math;
 mod systems;
 
@@ -7,6 +8,7 @@ pub use components::{
     TopDownCamera, TopDownCameraBounds, TopDownCameraDamping, TopDownCameraDebug,
     TopDownCameraMode, TopDownCameraRuntime, TopDownCameraSettings, TopDownCameraTarget,
 };
+pub use input::{TopDownCameraInput, TopDownCameraInputPlugin};
 
 use bevy::{
     app::PostStartup,

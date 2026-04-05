@@ -106,6 +106,7 @@ pub(crate) fn resolve_follow_targets(
                 settings.dead_zone,
                 settings.soft_zone,
                 settings.bounds,
+                settings.bounds_soft_margin,
                 settings.mode,
                 yaw,
             );
@@ -216,6 +217,7 @@ pub(crate) fn clamp_programmatic_goal(
                 Vec2::ZERO,
                 Vec2::ZERO,
                 settings.bounds,
+                settings.bounds_soft_margin,
                 settings.mode,
                 runtime.yaw,
             );

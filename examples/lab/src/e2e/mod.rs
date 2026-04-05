@@ -16,10 +16,7 @@ pub struct TopDownCameraLabE2EPlugin;
 impl Plugin for TopDownCameraLabE2EPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(E2EPlugin);
-        app.add_systems(
-            Update,
-            enforce_authored_lab_defaults.before(E2ESet),
-        );
+        app.add_systems(Update, enforce_authored_lab_defaults.before(E2ESet));
         app.configure_sets(
             Update,
             (
