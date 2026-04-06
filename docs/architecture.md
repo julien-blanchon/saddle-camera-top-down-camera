@@ -17,11 +17,13 @@ The per-frame flow is:
    Clamp programmatic anchor and zoom requests to bounds and min or max ranges.
 3. **ApplySmoothing**
    Smooth planar anchor movement, height, yaw, and zoom independently into `TopDownCameraRuntime`.
-4. **SyncTransform**
-   Write the final camera transform from runtime state.
-5. **SyncProjection**
-   Update orthographic projection scale when the camera uses an orthographic projection.
-6. **DebugDraw**
+4. **ComposeEffects**
+   Compose all active `TopDownCameraCustomEffects` layers into `render_anchor`, `render_yaw`, `render_zoom`, and `render_fov_delta`. Without custom effects the render fields equal the raw follow state. User effect systems should run **before** this set.
+5. **SyncTransform**
+   Write the final camera transform from the composed render state.
+6. **SyncProjection**
+   Update orthographic projection scale from `render_zoom`.
+7. **DebugDraw**
    Optionally draw dead zone, bounds, anchor, and tracked-point gizmos.
 
 ## Dead Zone, Soft Zone, And Smoothing

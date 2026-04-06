@@ -1,5 +1,6 @@
 mod components;
 mod debug;
+pub mod effects;
 pub mod input;
 mod math;
 mod systems;
@@ -7,6 +8,10 @@ mod systems;
 pub use components::{
     TopDownCamera, TopDownCameraBounds, TopDownCameraDamping, TopDownCameraDebug,
     TopDownCameraMode, TopDownCameraRuntime, TopDownCameraSettings, TopDownCameraTarget,
+};
+pub use effects::{
+    NamedEffectLayer, TopDownCameraCustomEffects, TopDownCameraEffectLayer,
+    TopDownCameraEffectStack,
 };
 pub use input::{
     TopDownCameraInput, TopDownCameraInputBindingTable, TopDownCameraInputPlugin,
@@ -27,6 +32,9 @@ pub enum TopDownCameraSystems {
     ResolveTarget,
     ComputeGoal,
     ApplySmoothing,
+    /// Compose custom effect layers into render state. User systems that
+    /// write to [`TopDownCameraCustomEffects`] should run **before** this set.
+    ComposeEffects,
     SyncTransform,
     SyncProjection,
     DebugDraw,
@@ -83,6 +91,9 @@ impl Plugin for TopDownCameraPlugin {
             .register_type::<TopDownCameraRuntime>()
             .register_type::<TopDownCameraSettings>()
             .register_type::<TopDownCameraTarget>()
+            .register_type::<TopDownCameraCustomEffects>()
+            .register_type::<TopDownCameraEffectLayer>()
+            .register_type::<TopDownCameraEffectStack>()
             .add_systems(self.activate_schedule, activate_runtime)
             .add_systems(self.deactivate_schedule, deactivate_runtime)
             .add_systems(
@@ -98,6 +109,7 @@ impl Plugin for TopDownCameraPlugin {
                     TopDownCameraSystems::ResolveTarget,
                     TopDownCameraSystems::ComputeGoal,
                     TopDownCameraSystems::ApplySmoothing,
+                    TopDownCameraSystems::ComposeEffects,
                 )
                     .chain(),
             )
@@ -123,6 +135,12 @@ impl Plugin for TopDownCameraPlugin {
                 self.update_schedule,
                 systems::advance_runtime
                     .in_set(TopDownCameraSystems::ApplySmoothing)
+                    .run_if(runtime_is_active),
+            )
+            .add_systems(
+                self.update_schedule,
+                effects::compose_effects
+                    .in_set(TopDownCameraSystems::ComposeEffects)
                     .run_if(runtime_is_active),
             )
             .configure_sets(

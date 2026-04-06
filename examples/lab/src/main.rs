@@ -21,6 +21,11 @@ struct SecondaryTarget;
 #[derive(Component)]
 struct LabOverlay;
 
+/// When this resource is present, `enforce_authored_lab_defaults` is skipped.
+/// E2E scenarios insert this when they reconfigure camera settings.
+#[derive(Resource)]
+pub struct LabDefaultsOverridden;
+
 #[derive(Resource, Clone, Copy)]
 pub struct LabCameraEntity(pub Entity);
 

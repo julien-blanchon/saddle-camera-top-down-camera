@@ -192,3 +192,40 @@ The crate keeps only neutral defaults for these bindings. Genre-specific presets
 | `draw_dead_zone` | `bool` | `true` | Draw the dead-zone rectangle on the follow plane. |
 | `draw_bounds` | `bool` | `true` | Draw the center-bounds rectangle when bounds are configured. |
 | `draw_targets` | `bool` | `true` | Draw the follow anchor, goal anchor, tracked point, and the line between anchor and target. |
+
+## `TopDownCameraEffectLayer`
+
+| Field | Type | Default | Valid Range | Effect |
+| --- | --- | --- | --- | --- |
+| `anchor_offset` | `Vec3` | `Vec3::ZERO` | Any finite value | World-space offset applied to the follow anchor. |
+| `zoom_delta` | `f32` | `0.0` | Any finite value | Additive change to the zoom level. Clamped to `zoom_min..zoom_max` after composition. |
+| `yaw_delta` | `f32` | `0.0` | Any finite radians | Additive change to the yaw angle. |
+| `fov_delta` | `f32` | `0.0` | Any finite value | FOV offset exposed on `TopDownCameraRuntime::render_fov_delta`. Not auto-applied to the projection; consumers read it and apply it themselves. |
+| `weight` | `f32` | `1.0` | Non-negative | Blending weight. Each field is multiplied by `weight` before summing. |
+| `enabled` | `bool` | `true` | `true` or `false` | Disabled layers are skipped during composition. |
+
+### Convenience Constructors
+
+- `TopDownCameraEffectLayer::anchor(offset)` — anchor offset only, weight 1.0
+- `TopDownCameraEffectLayer::zoom(delta)` — zoom delta only, weight 1.0
+- `TopDownCameraEffectLayer::yaw(delta)` — yaw delta only, weight 1.0
+- `TopDownCameraEffectLayer::weighted(anchor_offset, zoom_delta, yaw_delta, fov_delta, weight)` — full control
+
+## `TopDownCameraCustomEffects`
+
+Attach to a `TopDownCamera` entity. Multiple named layers compose additively.
+
+| Method | Effect |
+| --- | --- |
+| `set(name, layer)` | Insert or replace a named layer. |
+| `remove(name)` | Remove a named layer. Returns the layer if it existed. |
+| `get(name)` / `get_mut(name)` | Access a layer by name. |
+| `active_count()` | Count of enabled layers. |
+| `iter()` | Iterate all layers. |
+
+The compose system runs in `TopDownCameraSystems::ComposeEffects` and writes the summed result to:
+
+- `TopDownCameraRuntime::render_anchor` — follow anchor + all anchor offsets
+- `TopDownCameraRuntime::render_yaw` — yaw + all yaw deltas
+- `TopDownCameraRuntime::render_zoom` — zoom + all zoom deltas (clamped)
+- `TopDownCameraRuntime::render_fov_delta` — summed FOV delta for consumer use

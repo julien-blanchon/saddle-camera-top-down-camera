@@ -5027,6 +5027,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "saddle-camera-top-down-camera-example-custom-effects"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "saddle-camera-top-down-camera",
+ "saddle-camera-top-down-camera-example-common",
+ "saddle-pane",
+]
+
+[[package]]
 name = "saddle-camera-top-down-camera-example-optional-controls"
 version = "0.1.0"
 dependencies = [

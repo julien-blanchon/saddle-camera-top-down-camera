@@ -292,7 +292,7 @@ pub(crate) fn sync_transform(
         match settings.mode {
             TopDownCameraMode::Flat2d { depth } => {
                 transform.translation =
-                    Vec3::new(runtime.follow_anchor.x, runtime.follow_anchor.y, depth);
+                    Vec3::new(runtime.render_anchor.x, runtime.render_anchor.y, depth);
                 transform.rotation = Quat::IDENTITY;
             }
             TopDownCameraMode::Tilted3d {
@@ -301,15 +301,15 @@ pub(crate) fn sync_transform(
             } => {
                 let distance = match projection {
                     Some(Projection::Orthographic(_)) => orthographic_distance,
-                    _ => runtime.zoom,
+                    _ => runtime.render_zoom,
                 };
                 transform.translation = tilted_3d_camera_translation(
-                    runtime.follow_anchor,
-                    runtime.yaw,
+                    runtime.render_anchor,
+                    runtime.render_yaw,
                     pitch,
                     distance,
                 );
-                transform.look_at(runtime.follow_anchor, Vec3::Y);
+                transform.look_at(runtime.render_anchor, Vec3::Y);
             }
         }
     }
@@ -318,7 +318,7 @@ pub(crate) fn sync_transform(
 pub(crate) fn sync_projection(mut cameras: Query<(&TopDownCameraRuntime, &mut Projection)>) {
     for (runtime, mut projection) in &mut cameras {
         if let Projection::Orthographic(orthographic) = &mut *projection {
-            orthographic.scale = runtime.zoom.max(0.001);
+            orthographic.scale = runtime.render_zoom.max(0.001);
         }
     }
 }

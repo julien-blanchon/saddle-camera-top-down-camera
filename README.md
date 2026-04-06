@@ -65,7 +65,7 @@ For always-on tools and examples, `TopDownCameraPlugin::always_on(Update)` is th
 | Type | Purpose |
 | --- | --- |
 | `TopDownCameraPlugin` | Registers the runtime with injectable activate, deactivate, and update schedules |
-| `TopDownCameraSystems` | Public ordering hooks: `ResolveTarget`, `ComputeGoal`, `ApplySmoothing`, `SyncTransform`, `SyncProjection`, `DebugDraw` |
+| `TopDownCameraSystems` | Public ordering hooks: `ResolveTarget`, `ComputeGoal`, `ApplySmoothing`, `ComposeEffects`, `SyncTransform`, `SyncProjection`, `DebugDraw` |
 | `TopDownCamera` | Desired camera state: target anchor, yaw, zoom, explicit tracked target, follow toggle, snap requests |
 | `TopDownCameraSettings` | Tuning surface for mode, dead zone, soft zone, framing bias, damping, bounds, and zoom limits |
 | `TopDownCameraTarget` | Follow candidate marker with priority, anchor offset, optional velocity look-ahead, and enable flag |
@@ -75,6 +75,9 @@ For always-on tools and examples, `TopDownCameraPlugin::always_on(Update)` is th
 | `TopDownCameraInput` | Neutral tuning surface for built-in pan, drag, zoom, rotate, and edge-scroll behavior |
 | `TopDownCameraInputPolicy` | Bindable input policy component with active-camera filtering and mapping tables |
 | `TopDownCameraInputBindingTable` | Keyboard and mouse mapping data used by the built-in controller |
+| `TopDownCameraCustomEffects` | Named effect layers that compose additively with the follow state for screen shake, breathing sway, zoom pulses, etc. |
+| `TopDownCameraEffectLayer` | A single weighted effect: anchor offset, zoom delta, yaw delta, FOV delta |
+| `TopDownCameraEffectStack` | The composed result of all active effect layers (read from `TopDownCameraRuntime::render_*` fields) |
 | `TopDownCameraInputPlugin` | Optional plugin that adds input processing for cameras with `TopDownCameraInput` plus `TopDownCameraInputPolicy`; `new(schedule)` injects the update schedule |
 
 ## Dead Zone Semantics
@@ -122,6 +125,42 @@ For orthographic cameras, visible extents still depend on `OrthographicProjectio
 
 The current implementation does not shrink bounds based on visible extents, so an orthographic camera can still show past the edge if its zoom scale is large enough. That tradeoff is deliberate for the first version and is documented here rather than hidden.
 
+## Custom Effects
+
+The crate provides an extensibility layer through `TopDownCameraCustomEffects`. Attach this component to your camera entity and push named effect layers from independent systems. Effects compose additively after smoothing but before the final transform sync.
+
+```rust,no_run
+use bevy::prelude::*;
+use saddle_camera_top_down_camera::{
+    TopDownCamera, TopDownCameraCustomEffects, TopDownCameraEffectLayer, TopDownCameraSystems,
+};
+
+fn update_screen_shake(
+    time: Res<Time>,
+    mut query: Query<&mut TopDownCameraCustomEffects, With<TopDownCamera>>,
+) {
+    for mut custom in &mut query {
+        let t = time.elapsed_secs() * 25.0;
+        custom.set("shake", TopDownCameraEffectLayer::anchor(
+            Vec3::new(t.sin() * 0.15, 0.0, t.cos() * 0.12),
+        ));
+    }
+}
+```
+
+Effect systems should run **before** `TopDownCameraSystems::ComposeEffects`. Each layer has:
+
+| Field | Purpose |
+| --- | --- |
+| `anchor_offset` | World-space shift to the follow anchor |
+| `zoom_delta` | Additive change to zoom level |
+| `yaw_delta` | Additive change to yaw (radians) |
+| `fov_delta` | FOV delta (exposed on `TopDownCameraRuntime::render_fov_delta` for consumer use) |
+| `weight` | Blending weight (0.0 = no contribution, 1.0 = full) |
+| `enabled` | Skip this layer when false |
+
+The composed result is written to `TopDownCameraRuntime::render_anchor`, `render_yaw`, and `render_zoom`, which the transform sync reads. Without any custom effects the render fields equal the raw follow state.
+
 ## Input Model
 
 The crate provides an optional `TopDownCameraInputPlugin` with a neutral `TopDownCameraInput` tuning component and a bindable `TopDownCameraInputPolicy`. Attach both to any camera entity alongside `TopDownCamera` and `TopDownCameraSettings` to enable:
@@ -161,6 +200,7 @@ Rotation lock is achieved by leaving `TopDownCamera.target_yaw` unchanged. `Flat
 | `optional_controls` | `bevy_enhanced_input` bridge that moves the target and adjusts camera yaw and zoom | `cargo run -p saddle-camera-top-down-camera-example-optional-controls` |
 | `strategy_game` | Strategy/RTS camera with edge scrolling, zoom-to-cursor, map bounds, and soft clamping | `cargo run -p saddle-camera-top-down-camera-example-strategy-game` |
 | `arpg_camera` | ARPG-style follow camera with character movement, look-ahead, and target switching | `cargo run -p saddle-camera-top-down-camera-example-arpg-camera` |
+| `custom_effects` | Three additive custom effects (screen shake, breathing sway, zoom pulse) with live tweaking | `cargo run -p saddle-camera-top-down-camera-example-custom-effects` |
 
 ## Workspace Lab
 
@@ -181,6 +221,23 @@ cargo run -p saddle-camera-top-down-camera-lab --features e2e -- top_down_camera
 cargo run -p saddle-camera-top-down-camera-lab --features e2e -- top_down_camera_soft_zone
 cargo run -p saddle-camera-top-down-camera-lab --features e2e -- top_down_camera_target_switch
 ```
+
+### Per-Example E2E Scenarios
+
+Each standalone example has a matching E2E scenario in the lab that reconfigures the camera to match that example's exact settings, teleports a target, and validates follow behavior. These are useful for debugging specific example configurations:
+
+```bash
+cargo run -p saddle-camera-top-down-camera-lab --features e2e -- example_basic_2d
+cargo run -p saddle-camera-top-down-camera-lab --features e2e -- example_basic_3d
+cargo run -p saddle-camera-top-down-camera-lab --features e2e -- example_bounds
+cargo run -p saddle-camera-top-down-camera-lab --features e2e -- example_target_switching
+cargo run -p saddle-camera-top-down-camera-lab --features e2e -- example_soft_zone_framing
+cargo run -p saddle-camera-top-down-camera-lab --features e2e -- example_optional_controls
+cargo run -p saddle-camera-top-down-camera-lab --features e2e -- example_strategy_game
+cargo run -p saddle-camera-top-down-camera-lab --features e2e -- example_arpg_camera
+```
+
+Each scenario captures before/after screenshots to `e2e_output/<scenario_name>/` and dumps the `TopDownCameraRuntime` to JSON for inspection. Add `--handoff` to keep the game running after the scenario completes for interactive debugging.
 
 ## Known Limitations
 

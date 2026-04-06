@@ -9,6 +9,7 @@ members = [
     "optional_controls",
     "strategy_game",
     "arpg_camera",
+    "custom_effects",
     "lab",
 ]
 resolver = "3"

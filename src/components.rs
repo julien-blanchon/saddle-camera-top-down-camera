@@ -192,6 +192,15 @@ pub struct TopDownCameraRuntime {
     pub tracked_point: Vec3,
     pub yaw: f32,
     pub zoom: f32,
+    /// Follow anchor with custom effects applied. Written by the compose
+    /// effects stage; read by transform sync.
+    pub render_anchor: Vec3,
+    /// Yaw with custom effects applied.
+    pub render_yaw: f32,
+    /// Zoom with custom effects applied and clamped.
+    pub render_zoom: f32,
+    /// FOV delta from custom effects (perspective cameras only).
+    pub render_fov_delta: f32,
 }
 
 impl TopDownCameraRuntime {
@@ -203,6 +212,10 @@ impl TopDownCameraRuntime {
             tracked_point: camera.target_anchor,
             yaw: camera.target_yaw,
             zoom: camera.zoom,
+            render_anchor: camera.target_anchor,
+            render_yaw: camera.target_yaw,
+            render_zoom: camera.zoom,
+            render_fov_delta: 0.0,
         }
     }
 }
