@@ -8,7 +8,8 @@ use bevy_enhanced_input::prelude::{
 };
 use bevy_flair::prelude::InlineStyle;
 use saddle_camera_top_down_camera::{
-    TopDownCamera, TopDownCameraDebug, TopDownCameraMode, TopDownCameraSettings,
+    TopDownCamera, TopDownCameraDebug, TopDownCameraInput, TopDownCameraInputPolicy,
+    TopDownCameraInputTargetFilter, TopDownCameraMode, TopDownCameraSettings,
 };
 use saddle_pane::prelude::*;
 
@@ -534,6 +535,35 @@ pub fn spawn_camera_3d_orthographic(
     }
 
     entity.id()
+}
+
+pub fn strategy_camera_input() -> (TopDownCameraInput, TopDownCameraInputPolicy) {
+    (
+        TopDownCameraInput {
+            edge_scroll_enabled: true,
+            edge_scroll_speed: 12.0,
+            keyboard_pan_speed: 14.0,
+            scroll_zoom_sensitivity: 0.2,
+            ..default()
+        },
+        TopDownCameraInputPolicy {
+            target_filter: TopDownCameraInputTargetFilter::ActiveViewport,
+            ..default()
+        },
+    )
+}
+
+pub fn arpg_camera_input() -> (TopDownCameraInput, TopDownCameraInputPolicy) {
+    (
+        TopDownCameraInput {
+            keyboard_pan_enabled: false,
+            mouse_drag_enabled: false,
+            edge_scroll_enabled: false,
+            keyboard_zoom_speed: 3.0,
+            ..default()
+        },
+        TopDownCameraInputPolicy::default(),
+    )
 }
 
 pub fn attach_target_controls(commands: &mut Commands, target: Entity) {

@@ -8,7 +8,11 @@ pub use components::{
     TopDownCamera, TopDownCameraBounds, TopDownCameraDamping, TopDownCameraDebug,
     TopDownCameraMode, TopDownCameraRuntime, TopDownCameraSettings, TopDownCameraTarget,
 };
-pub use input::{TopDownCameraInput, TopDownCameraInputPlugin};
+pub use input::{
+    TopDownCameraInput, TopDownCameraInputBindingTable, TopDownCameraInputPlugin,
+    TopDownCameraInputPolicy, TopDownCameraInputSystems, TopDownCameraInputTargetFilter,
+    TopDownCameraKeyAxisBinding,
+};
 
 use bevy::{
     app::PostStartup,

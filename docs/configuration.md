@@ -130,14 +130,14 @@ The crate smooths the sampled target velocity internally before applying look-ah
 
 ## `TopDownCameraInput`
 
-Optional component for built-in input handling. Requires `TopDownCameraInputPlugin`.
+Optional tuning component for built-in input handling. Requires both
+`TopDownCameraInputPlugin` and `TopDownCameraInputPolicy`.
 
 | Field | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `keyboard_pan_enabled` | `bool` | `true` | Enable WASD / arrow key panning. |
 | `keyboard_pan_speed` | `f32` | `10.0` | Pan speed in world units per second. Scaled by zoom in `Flat2d`. |
 | `mouse_drag_enabled` | `bool` | `true` | Enable mouse drag panning. |
-| `mouse_drag_button` | `MouseButton` | `Middle` | Which button activates drag panning. |
 | `scroll_zoom_enabled` | `bool` | `true` | Enable scroll wheel zoom. |
 | `scroll_zoom_sensitivity` | `f32` | `0.15` | Zoom per scroll line (proportional to current zoom). |
 | `zoom_to_cursor` | `bool` | `true` | Zoom toward cursor position instead of screen center. |
@@ -149,10 +149,41 @@ Optional component for built-in input handling. Requires `TopDownCameraInputPlug
 | `keyboard_zoom_enabled` | `bool` | `true` | Enable +/- keyboard zoom. |
 | `keyboard_zoom_speed` | `f32` | `2.0` | Keyboard zoom speed in units per second. |
 
-### Presets
+## `TopDownCameraInputPolicy`
 
-- `TopDownCameraInput::strategy()` — edge scroll enabled, faster pan and zoom
-- `TopDownCameraInput::arpg()` — keyboard pan and mouse drag disabled, just zoom and rotate
+Bindable policy component for the built-in controller.
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `target_filter` | `TopDownCameraInputTargetFilter` | `ActiveCamera` | Controls which cameras are allowed to consume built-in input on a frame. |
+| `bindings` | `TopDownCameraInputBindingTable` | See below | Keyboard and mouse mapping data for the built-in controller. |
+
+## `TopDownCameraInputTargetFilter`
+
+| Variant | Effect |
+| --- | --- |
+| `AnyCamera` | Apply input to every camera with `TopDownCameraInput` and `TopDownCameraInputPolicy`. |
+| `ActiveCamera` | Apply input only to active cameras. |
+| `ActiveViewport` | Apply input only to active cameras whose viewport currently contains the cursor. |
+
+## `TopDownCameraInputBindingTable`
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `keyboard_pan_x` | `TopDownCameraKeyAxisBinding` | `A / Left` and `D / Right` | Horizontal keyboard pan axis. |
+| `keyboard_pan_y` | `TopDownCameraKeyAxisBinding` | `S / Down` and `W / Up` | Vertical keyboard pan axis. |
+| `keyboard_rotate` | `TopDownCameraKeyAxisBinding` | `Q` and `E` | Signed yaw axis. |
+| `keyboard_zoom` | `TopDownCameraKeyAxisBinding` | `=` / `NumpadAdd` and `-` / `NumpadSubtract` | Signed keyboard zoom axis. |
+| `mouse_drag_buttons` | `Vec<MouseButton>` | `[Middle]` | Any pressed button in the list enables mouse drag panning. |
+
+The crate keeps only neutral defaults for these bindings. Genre-specific presets now live in example code, where `TopDownCameraInput` and `TopDownCameraInputPolicy` are composed explicitly.
+
+## `TopDownCameraKeyAxisBinding`
+
+| Field | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `negative` | `Vec<KeyCode>` | `[]` | Keys that drive the axis toward `-1.0`. |
+| `positive` | `Vec<KeyCode>` | `[]` | Keys that drive the axis toward `1.0`. |
 
 ## `TopDownCameraDebug`
 

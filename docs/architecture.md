@@ -111,9 +111,11 @@ The examples intentionally move their targets before `ResolveTarget` for that re
 
 ## Built-In Input Module
 
-The crate provides an optional `TopDownCameraInputPlugin` with a `TopDownCameraInput` component. This decouples the framing runtime from input handling — consumers can use it, replace it, or skip it entirely.
+The crate provides an optional `TopDownCameraInputPlugin` with a neutral `TopDownCameraInput` tuning component and a bindable `TopDownCameraInputPolicy`. This keeps the framing runtime decoupled from input handling while still providing an ergonomic built-in controller.
 
-The input module runs all systems `before(TopDownCameraSystems::ResolveTarget)` and covers:
+`TopDownCameraInputPlugin::default()` runs on `Update`. `TopDownCameraInputPlugin::new(schedule)` lets consumers align input with the same custom schedule used by `TopDownCameraPlugin`.
+
+The input module runs all systems in `TopDownCameraInputSystems::ApplyControls`, ordered `before(TopDownCameraSystems::ResolveTarget)`, and covers:
 - keyboard panning (WASD/arrows, zoom-scaled)
 - mouse drag panning (pixel-to-world conversion for both 2D and 3D)
 - scroll wheel zoom with optional zoom-to-cursor
@@ -121,7 +123,14 @@ The input module runs all systems `before(TopDownCameraSystems::ResolveTarget)` 
 - keyboard rotation (Q/E for yaw)
 - keyboard zoom (+/- keys)
 
-Input systems only query entities that have both `TopDownCameraInput` and `TopDownCamera`. Cameras without the input component are unaffected.
+Input systems only query entities that have `TopDownCameraInput`, `TopDownCameraInputPolicy`, and `TopDownCamera`. Cameras without those components are unaffected.
+
+The policy layer also filters dispatch:
+- `ActiveCamera` keeps inactive cameras from consuming the same input stream
+- `ActiveViewport` further requires the cursor to be inside the camera viewport
+- pointer-driven paths use viewport-local cursor math so drag, edge-scroll, and zoom-to-cursor do not broadcast across every camera in a multi-camera setup
+
+Genre-flavored presets such as RTS or ARPG input live in example code rather than the runtime crate.
 
 ## Bounds Soft Margin
 

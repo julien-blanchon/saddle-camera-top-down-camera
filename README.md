@@ -72,8 +72,10 @@ For always-on tools and examples, `TopDownCameraPlugin::always_on(Update)` is th
 | `TopDownCameraRuntime` | Smoothed runtime state plus the active target, tracked point, and current anchor |
 | `TopDownCameraBounds` | Center-only planar bounds clamp for the camera anchor |
 | `TopDownCameraDebug` | Opt-in debug gizmos for dead zone, bounds, follow anchor, and tracked point |
-| `TopDownCameraInput` | Configuration component for built-in mouse, keyboard, and edge-scroll input handling |
-| `TopDownCameraInputPlugin` | Optional plugin that adds input processing for cameras with `TopDownCameraInput` |
+| `TopDownCameraInput` | Neutral tuning surface for built-in pan, drag, zoom, rotate, and edge-scroll behavior |
+| `TopDownCameraInputPolicy` | Bindable input policy component with active-camera filtering and mapping tables |
+| `TopDownCameraInputBindingTable` | Keyboard and mouse mapping data used by the built-in controller |
+| `TopDownCameraInputPlugin` | Optional plugin that adds input processing for cameras with `TopDownCameraInput` plus `TopDownCameraInputPolicy`; `new(schedule)` injects the update schedule |
 
 ## Dead Zone Semantics
 
@@ -122,7 +124,7 @@ The current implementation does not shrink bounds based on visible extents, so a
 
 ## Input Model
 
-The crate provides an optional `TopDownCameraInputPlugin` with a `TopDownCameraInput` component for built-in input handling. Attach `TopDownCameraInput` to any camera entity alongside `TopDownCamera` and `TopDownCameraSettings` to enable:
+The crate provides an optional `TopDownCameraInputPlugin` with a neutral `TopDownCameraInput` tuning component and a bindable `TopDownCameraInputPolicy`. Attach both to any camera entity alongside `TopDownCamera` and `TopDownCameraSettings` to enable:
 
 - **Keyboard panning** (WASD / arrows) with zoom-scaled speed
 - **Mouse drag panning** (configurable button, default middle)
@@ -131,9 +133,17 @@ The crate provides an optional `TopDownCameraInputPlugin` with a `TopDownCameraI
 - **Keyboard rotation** (Q/E for yaw in `Tilted3d` mode)
 - **Keyboard zoom** (+/- keys)
 
-Two presets are provided: `TopDownCameraInput::strategy()` (edge scroll, fast pan, zoom-to-cursor) and `TopDownCameraInput::arpg()` (no manual pan or drag, just zoom and rotate).
+`TopDownCameraInputPolicy` exposes:
 
-Consumers who need custom input handling can skip `TopDownCameraInputPlugin` and mutate `TopDownCamera` directly.
+- a `TopDownCameraInputBindingTable` for keyboard axes and mouse drag buttons
+- `TopDownCameraInputTargetFilter` for `AnyCamera`, `ActiveCamera`, or `ActiveViewport` dispatch
+- viewport-aware mouse routing so drag, scroll, and edge-scroll do not broadcast across every camera
+
+The core crate keeps only neutral defaults. Genre presets such as the RTS and ARPG setups now live in example code, where they compose `TopDownCameraInput` and `TopDownCameraInputPolicy` explicitly.
+
+Consumers who need custom input handling can skip `TopDownCameraInputPlugin`, or reuse the public binding-table types while mutating `TopDownCamera` directly.
+
+`TopDownCameraInputPlugin::default()` runs on `Update`. Use `TopDownCameraInputPlugin::new(schedule)` when the camera runtime is driven from a custom schedule and order it before `TopDownCameraSystems::ResolveTarget`.
 
 The examples and lab also include a `bevy_enhanced_input` bridge for target movement and camera controls, but that code lives outside the runtime crate.
 

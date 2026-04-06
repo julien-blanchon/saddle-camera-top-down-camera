@@ -2,8 +2,8 @@ use saddle_camera_top_down_camera_example_common as common;
 
 use bevy::prelude::*;
 use saddle_camera_top_down_camera::{
-    TopDownCameraBounds, TopDownCameraInput, TopDownCameraInputPlugin, TopDownCameraPlugin,
-    TopDownCameraSettings, TopDownCameraTarget,
+    TopDownCameraBounds, TopDownCameraInputPlugin, TopDownCameraPlugin, TopDownCameraSettings,
+    TopDownCameraTarget,
 };
 
 /// Marker for the automated patrol unit.
@@ -16,7 +16,7 @@ fn main() {
     app.add_plugins((
         DefaultPlugins,
         TopDownCameraPlugin::default(),
-        TopDownCameraInputPlugin,
+        TopDownCameraInputPlugin::default(),
     ));
     common::install_pane(&mut app);
     app.add_systems(Startup, setup);
@@ -105,9 +105,11 @@ fn setup(
         true,
     );
 
-    // Attach the built-in strategy input preset
+    let (input, policy) = common::strategy_camera_input();
+
     commands.entity(camera).insert((
-        TopDownCameraInput::strategy(),
+        input,
+        policy,
         saddle_camera_top_down_camera::TopDownCamera {
             tracked_target: Some(patrol),
             follow_enabled: false, // Strategy cameras don't auto-follow

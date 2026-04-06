@@ -2,8 +2,7 @@ use saddle_camera_top_down_camera_example_common as common;
 
 use bevy::prelude::*;
 use saddle_camera_top_down_camera::{
-    TopDownCameraInput, TopDownCameraInputPlugin, TopDownCameraPlugin, TopDownCameraSettings,
-    TopDownCameraTarget,
+    TopDownCameraInputPlugin, TopDownCameraPlugin, TopDownCameraSettings, TopDownCameraTarget,
 };
 
 fn main() {
@@ -12,7 +11,7 @@ fn main() {
     app.add_plugins((
         DefaultPlugins,
         TopDownCameraPlugin::default(),
-        TopDownCameraInputPlugin,
+        TopDownCameraInputPlugin::default(),
         common::ExampleTopDownCameraControlsPlugin,
     ));
     common::install_pane(&mut app);
@@ -96,9 +95,11 @@ fn setup(
         true,
     );
 
-    // Attach ARPG input preset (no keyboard pan, no drag, just zoom + rotate)
+    let (input, policy) = common::arpg_camera_input();
+
     commands.entity(camera).insert((
-        TopDownCameraInput::arpg(),
+        input,
+        policy,
         saddle_camera_top_down_camera::TopDownCamera {
             tracked_target: Some(hero),
             ..saddle_camera_top_down_camera::TopDownCamera::looking_at_3d(

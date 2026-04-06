@@ -1,7 +1,9 @@
 use bevy::{
+    camera::RenderTarget,
+    ecs::{intern::Interned, schedule::ScheduleLabel},
     input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseScrollUnit},
     prelude::*,
-    window::PrimaryWindow,
+    window::WindowRef,
 };
 
 use crate::{
@@ -9,24 +11,140 @@ use crate::{
     TopDownCameraSystems, math::planar_frame,
 };
 
+/// High-level ordering hook for the built-in input controller.
+#[derive(SystemSet, Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum TopDownCameraInputSystems {
+    ApplyControls,
+}
+
+/// Bindable signed keyboard axis used by the built-in camera controller.
+#[derive(Reflect, Clone, Debug, Default, PartialEq, Eq)]
+pub struct TopDownCameraKeyAxisBinding {
+    pub negative: Vec<KeyCode>,
+    pub positive: Vec<KeyCode>,
+}
+
+impl TopDownCameraKeyAxisBinding {
+    pub fn new(
+        negative: impl IntoIterator<Item = KeyCode>,
+        positive: impl IntoIterator<Item = KeyCode>,
+    ) -> Self {
+        Self {
+            negative: negative.into_iter().collect(),
+            positive: positive.into_iter().collect(),
+        }
+    }
+
+    pub fn value(&self, keys: &ButtonInput<KeyCode>) -> f32 {
+        let negative = self.negative.iter().any(|key| keys.pressed(*key));
+        let positive = self.positive.iter().any(|key| keys.pressed(*key));
+
+        match (negative, positive) {
+            (true, false) => -1.0,
+            (false, true) => 1.0,
+            _ => 0.0,
+        }
+    }
+}
+
+/// Keyboard and mouse mapping table used by the built-in controller.
+#[derive(Reflect, Clone, Debug, PartialEq, Eq)]
+pub struct TopDownCameraInputBindingTable {
+    pub keyboard_pan_x: TopDownCameraKeyAxisBinding,
+    pub keyboard_pan_y: TopDownCameraKeyAxisBinding,
+    pub keyboard_rotate: TopDownCameraKeyAxisBinding,
+    pub keyboard_zoom: TopDownCameraKeyAxisBinding,
+    pub mouse_drag_buttons: Vec<MouseButton>,
+}
+
+impl TopDownCameraInputBindingTable {
+    pub fn keyboard_pan(&self, keys: &ButtonInput<KeyCode>) -> Vec2 {
+        Vec2::new(
+            self.keyboard_pan_x.value(keys),
+            self.keyboard_pan_y.value(keys),
+        )
+    }
+
+    pub fn keyboard_rotate(&self, keys: &ButtonInput<KeyCode>) -> f32 {
+        self.keyboard_rotate.value(keys)
+    }
+
+    pub fn keyboard_zoom(&self, keys: &ButtonInput<KeyCode>) -> f32 {
+        self.keyboard_zoom.value(keys)
+    }
+
+    pub fn mouse_drag_active(&self, buttons: &ButtonInput<MouseButton>) -> bool {
+        self.mouse_drag_buttons
+            .iter()
+            .any(|button| buttons.pressed(*button))
+    }
+}
+
+impl Default for TopDownCameraInputBindingTable {
+    fn default() -> Self {
+        Self {
+            keyboard_pan_x: TopDownCameraKeyAxisBinding::new(
+                [KeyCode::KeyA, KeyCode::ArrowLeft],
+                [KeyCode::KeyD, KeyCode::ArrowRight],
+            ),
+            keyboard_pan_y: TopDownCameraKeyAxisBinding::new(
+                [KeyCode::KeyS, KeyCode::ArrowDown],
+                [KeyCode::KeyW, KeyCode::ArrowUp],
+            ),
+            keyboard_rotate: TopDownCameraKeyAxisBinding::new([KeyCode::KeyQ], [KeyCode::KeyE]),
+            keyboard_zoom: TopDownCameraKeyAxisBinding::new(
+                [KeyCode::Equal, KeyCode::NumpadAdd],
+                [KeyCode::Minus, KeyCode::NumpadSubtract],
+            ),
+            mouse_drag_buttons: vec![MouseButton::Middle],
+        }
+    }
+}
+
+/// Which camera target is allowed to consume built-in input on a frame.
+#[derive(Reflect, Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum TopDownCameraInputTargetFilter {
+    /// Apply input to every camera with matching input components.
+    AnyCamera,
+    /// Only apply input to active cameras.
+    #[default]
+    ActiveCamera,
+    /// Only apply input to active cameras whose viewport currently contains the cursor.
+    ActiveViewport,
+}
+
+/// Built-in input policy: bindings plus camera-target filtering.
+#[derive(Component, Reflect, Clone, Debug)]
+#[reflect(Component)]
+pub struct TopDownCameraInputPolicy {
+    pub target_filter: TopDownCameraInputTargetFilter,
+    pub bindings: TopDownCameraInputBindingTable,
+}
+
+impl Default for TopDownCameraInputPolicy {
+    fn default() -> Self {
+        Self {
+            target_filter: TopDownCameraInputTargetFilter::ActiveCamera,
+            bindings: TopDownCameraInputBindingTable::default(),
+        }
+    }
+}
+
 /// Configuration component for built-in top-down camera input handling.
 ///
-/// Attach this to any entity that also has [`TopDownCamera`] and
-/// [`TopDownCameraSettings`] to enable mouse, keyboard, and touch input.
-///
-/// Every feature can be individually toggled and configured.
+/// Attach this to any entity that also has [`TopDownCamera`],
+/// [`TopDownCameraSettings`], and [`TopDownCameraInputPolicy`] to enable the
+/// built-in controller.
 #[derive(Component, Reflect, Clone, Debug)]
 #[reflect(Component)]
 pub struct TopDownCameraInput {
-    /// Enable keyboard panning (WASD / arrow keys by default).
+    /// Enable keyboard panning.
     pub keyboard_pan_enabled: bool,
     /// Keyboard pan speed in world units per second.
     pub keyboard_pan_speed: f32,
 
     /// Enable mouse drag panning.
     pub mouse_drag_enabled: bool,
-    /// Which mouse button activates drag panning.
-    pub mouse_drag_button: MouseButton,
 
     /// Enable scroll wheel zoom.
     pub scroll_zoom_enabled: bool,
@@ -43,12 +161,12 @@ pub struct TopDownCameraInput {
     /// Edge scroll speed in world units per second at the screen edge.
     pub edge_scroll_speed: f32,
 
-    /// Enable Q/E keyboard rotation (only for `Tilted3d` mode).
+    /// Enable keyboard rotation.
     pub keyboard_rotate_enabled: bool,
     /// Rotation speed in radians per second.
     pub keyboard_rotate_speed: f32,
 
-    /// Enable keyboard zoom (+/- keys).
+    /// Enable keyboard zoom.
     pub keyboard_zoom_enabled: bool,
     /// Zoom speed for keyboard zoom in units per second.
     pub keyboard_zoom_speed: f32,
@@ -60,7 +178,6 @@ impl Default for TopDownCameraInput {
             keyboard_pan_enabled: true,
             keyboard_pan_speed: 10.0,
             mouse_drag_enabled: true,
-            mouse_drag_button: MouseButton::Middle,
             scroll_zoom_enabled: true,
             scroll_zoom_sensitivity: 0.15,
             zoom_to_cursor: true,
@@ -75,56 +192,52 @@ impl Default for TopDownCameraInput {
     }
 }
 
-impl TopDownCameraInput {
-    /// Preset for strategy/RTS games: edge scroll, zoom-to-cursor, keyboard pan.
-    pub fn strategy() -> Self {
-        Self {
-            edge_scroll_enabled: true,
-            edge_scroll_speed: 12.0,
-            keyboard_pan_speed: 14.0,
-            scroll_zoom_sensitivity: 0.2,
-            ..Self::default()
-        }
-    }
+/// Optional plugin that adds built-in input handling for top-down cameras.
+///
+/// Attach both [`TopDownCameraInput`] and [`TopDownCameraInputPolicy`] to any
+/// camera entity that also has [`TopDownCamera`] and [`TopDownCameraSettings`]
+/// to activate input processing.
+pub struct TopDownCameraInputPlugin {
+    pub update_schedule: Interned<dyn ScheduleLabel>,
+}
 
-    /// Preset for ARPG games: no edge scroll, no keyboard pan, just follow target.
-    pub fn arpg() -> Self {
+impl TopDownCameraInputPlugin {
+    pub fn new(update_schedule: impl ScheduleLabel) -> Self {
         Self {
-            keyboard_pan_enabled: false,
-            mouse_drag_enabled: false,
-            edge_scroll_enabled: false,
-            keyboard_zoom_speed: 3.0,
-            ..Self::default()
+            update_schedule: update_schedule.intern(),
         }
     }
 }
 
-/// Optional plugin that adds built-in input handling for top-down cameras.
-///
-/// Attach a [`TopDownCameraInput`] component to any camera entity that also has
-/// [`TopDownCamera`] and [`TopDownCameraSettings`] to activate input processing.
-///
-/// This plugin does NOT require `bevy_enhanced_input` and uses standard Bevy
-/// input resources directly.
-pub struct TopDownCameraInputPlugin;
+impl Default for TopDownCameraInputPlugin {
+    fn default() -> Self {
+        Self::new(Update)
+    }
+}
 
 impl Plugin for TopDownCameraInputPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<TopDownCameraInput>()
-            .add_systems(
-                Update,
-                (keyboard_pan_system, mouse_drag_pan_system)
+            .register_type::<TopDownCameraInputBindingTable>()
+            .register_type::<TopDownCameraInputPolicy>()
+            .register_type::<TopDownCameraInputTargetFilter>()
+            .register_type::<TopDownCameraKeyAxisBinding>()
+            .configure_sets(
+                self.update_schedule,
+                TopDownCameraInputSystems::ApplyControls
                     .before(TopDownCameraSystems::ResolveTarget),
             )
             .add_systems(
-                Update,
-                (scroll_zoom_system, edge_scroll_system)
-                    .before(TopDownCameraSystems::ResolveTarget),
-            )
-            .add_systems(
-                Update,
-                (keyboard_rotate_system, keyboard_zoom_system)
-                    .before(TopDownCameraSystems::ResolveTarget),
+                self.update_schedule,
+                (
+                    keyboard_pan_system,
+                    mouse_drag_pan_system,
+                    scroll_zoom_system,
+                    edge_scroll_system,
+                    keyboard_rotate_system,
+                    keyboard_zoom_system,
+                )
+                    .in_set(TopDownCameraInputSystems::ApplyControls),
             );
     }
 }
@@ -132,10 +245,15 @@ impl Plugin for TopDownCameraInputPlugin {
 fn keyboard_pan_system(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
+    windows: Query<&Window>,
+    primary_window: Query<Entity, With<bevy::window::PrimaryWindow>>,
     mut cameras: Query<(
         &TopDownCameraInput,
+        &TopDownCameraInputPolicy,
         &TopDownCameraSettings,
         &TopDownCameraRuntime,
+        &Camera,
+        Option<&RenderTarget>,
         &mut TopDownCamera,
     )>,
 ) {
@@ -144,32 +262,31 @@ fn keyboard_pan_system(
         return;
     }
 
-    for (input, settings, runtime, mut camera) in &mut cameras {
+    let primary_window = primary_window.single().ok();
+
+    for (input, policy, settings, runtime, camera_component, render_target, mut camera) in
+        &mut cameras
+    {
         if !input.keyboard_pan_enabled {
             continue;
         }
-
-        let mut direction = Vec2::ZERO;
-        if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-            direction.y += 1.0;
-        }
-        if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-            direction.y -= 1.0;
-        }
-        if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-            direction.x += 1.0;
-        }
-        if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-            direction.x -= 1.0;
+        if !matches_keyboard_target(
+            policy,
+            camera_component,
+            render_target,
+            &windows,
+            primary_window,
+        ) {
+            continue;
         }
 
+        let mut direction = policy.bindings.keyboard_pan(&keys);
         if direction == Vec2::ZERO {
             continue;
         }
 
         direction = direction.normalize();
 
-        // Scale pan speed by zoom so it feels consistent at different zoom levels.
         let zoom_scale = match settings.mode {
             TopDownCameraMode::Flat2d { .. } => runtime.zoom.max(0.1),
             TopDownCameraMode::Tilted3d { .. } => 1.0,
@@ -184,11 +301,15 @@ fn keyboard_pan_system(
 fn mouse_drag_pan_system(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     accumulated_motion: Res<AccumulatedMouseMotion>,
+    windows: Query<&Window>,
+    primary_window: Query<Entity, With<bevy::window::PrimaryWindow>>,
     mut cameras: Query<(
         &TopDownCameraInput,
+        &TopDownCameraInputPolicy,
         &TopDownCameraSettings,
         &TopDownCameraRuntime,
         &Camera,
+        Option<&RenderTarget>,
         &mut TopDownCamera,
     )>,
 ) {
@@ -197,17 +318,28 @@ fn mouse_drag_pan_system(
         return;
     }
 
-    for (input, settings, runtime, camera_component, mut camera) in &mut cameras {
+    let primary_window = primary_window.single().ok();
+
+    for (input, policy, settings, runtime, camera_component, render_target, mut camera) in
+        &mut cameras
+    {
         if !input.mouse_drag_enabled {
             continue;
         }
-        if !mouse_buttons.pressed(input.mouse_drag_button) {
+        if !policy.bindings.mouse_drag_active(&mouse_buttons) {
+            continue;
+        }
+        if !matches_pointer_target(
+            policy,
+            camera_component,
+            render_target,
+            &windows,
+            primary_window,
+        ) {
             continue;
         }
 
         let frame = planar_frame(settings.mode, runtime.yaw);
-
-        // Convert pixel motion to world units.
         let world_delta = match settings.mode {
             TopDownCameraMode::Flat2d { .. } => {
                 let Some(viewport_size) = camera_component.logical_viewport_size() else {
@@ -236,12 +368,15 @@ fn mouse_drag_pan_system(
 
 fn scroll_zoom_system(
     accumulated_scroll: Res<AccumulatedMouseScroll>,
-    windows: Query<&Window, With<PrimaryWindow>>,
+    windows: Query<&Window>,
+    primary_window: Query<Entity, With<bevy::window::PrimaryWindow>>,
     mut cameras: Query<(
         &TopDownCameraInput,
+        &TopDownCameraInputPolicy,
         &TopDownCameraSettings,
         &TopDownCameraRuntime,
         &Camera,
+        Option<&RenderTarget>,
         &mut TopDownCamera,
     )>,
 ) {
@@ -254,12 +389,21 @@ fn scroll_zoom_system(
         return;
     }
 
-    let Ok(window) = windows.single() else {
-        return;
-    };
+    let primary_window = primary_window.single().ok();
 
-    for (input, settings, runtime, camera_component, mut camera) in &mut cameras {
+    for (input, policy, settings, runtime, camera_component, render_target, mut camera) in
+        &mut cameras
+    {
         if !input.scroll_zoom_enabled {
+            continue;
+        }
+        if !matches_pointer_target(
+            policy,
+            camera_component,
+            render_target,
+            &windows,
+            primary_window,
+        ) {
             continue;
         }
 
@@ -267,58 +411,50 @@ fn scroll_zoom_system(
         camera.zoom -= scroll_delta * input.scroll_zoom_sensitivity * camera.zoom;
         camera.zoom = camera.zoom.clamp(settings.zoom_min, settings.zoom_max);
 
-        // Zoom-to-cursor: adjust anchor so cursor world position stays fixed.
-        if input.zoom_to_cursor && (camera.zoom - old_zoom).abs() > f32::EPSILON {
-            let Some(cursor_pos) = window.cursor_position() else {
-                continue;
-            };
+        if !input.zoom_to_cursor || (camera.zoom - old_zoom).abs() < f32::EPSILON {
+            continue;
+        }
 
-            match settings.mode {
-                TopDownCameraMode::Flat2d { .. } => {
-                    let Some(viewport_size) = camera_component.logical_viewport_size() else {
-                        continue;
-                    };
+        let Some((cursor_pos, viewport_size)) =
+            cursor_in_viewport(camera_component, render_target, &windows, primary_window)
+        else {
+            continue;
+        };
 
-                    // Normalized cursor position from center (-1..1)
-                    let normalized = Vec2::new(
-                        (cursor_pos.x / viewport_size.x - 0.5) * 2.0,
-                        -(cursor_pos.y / viewport_size.y - 0.5) * 2.0,
-                    );
+        match settings.mode {
+            TopDownCameraMode::Flat2d { .. } => {
+                let normalized = Vec2::new(
+                    (cursor_pos.x / viewport_size.x - 0.5) * 2.0,
+                    -(cursor_pos.y / viewport_size.y - 0.5) * 2.0,
+                );
+                let aspect = viewport_size.x / viewport_size.y.max(1.0);
 
-                    let aspect = viewport_size.x / viewport_size.y.max(1.0);
+                let world_before = Vec2::new(
+                    runtime.follow_anchor.x + normalized.x * old_zoom * aspect,
+                    runtime.follow_anchor.y + normalized.y * old_zoom,
+                );
+                let world_after = Vec2::new(
+                    runtime.follow_anchor.x + normalized.x * camera.zoom * aspect,
+                    runtime.follow_anchor.y + normalized.y * camera.zoom,
+                );
 
-                    // World position under cursor before and after zoom
-                    let world_before = Vec2::new(
-                        runtime.follow_anchor.x + normalized.x * old_zoom * aspect,
-                        runtime.follow_anchor.y + normalized.y * old_zoom,
-                    );
-                    let world_after = Vec2::new(
-                        runtime.follow_anchor.x + normalized.x * camera.zoom * aspect,
-                        runtime.follow_anchor.y + normalized.y * camera.zoom,
-                    );
+                let correction = world_before - world_after;
+                camera.target_anchor.x += correction.x;
+                camera.target_anchor.y += correction.y;
+            }
+            TopDownCameraMode::Tilted3d { .. } => {
+                let normalized = Vec2::new(
+                    (cursor_pos.x / viewport_size.x - 0.5) * 2.0,
+                    -(cursor_pos.y / viewport_size.y - 0.5) * 2.0,
+                );
 
-                    let correction = world_before - world_after;
-                    camera.target_anchor.x += correction.x;
-                    camera.target_anchor.y += correction.y;
-                }
-                TopDownCameraMode::Tilted3d { .. } => {
-                    let Some(viewport_size) = camera_component.logical_viewport_size() else {
-                        continue;
-                    };
-
-                    let normalized = Vec2::new(
-                        (cursor_pos.x / viewport_size.x - 0.5) * 2.0,
-                        -(cursor_pos.y / viewport_size.y - 0.5) * 2.0,
-                    );
-
-                    let frame = planar_frame(settings.mode, runtime.yaw);
-                    let scale_before = old_zoom * 0.5;
-                    let scale_after = camera.zoom * 0.5;
-                    let offset_before = frame.planar_offset(normalized * scale_before);
-                    let offset_after = frame.planar_offset(normalized * scale_after);
-                    let correction = offset_before - offset_after;
-                    camera.target_anchor += correction;
-                }
+                let frame = planar_frame(settings.mode, runtime.yaw);
+                let scale_before = old_zoom * 0.5;
+                let scale_after = camera.zoom * 0.5;
+                let offset_before = frame.planar_offset(normalized * scale_before);
+                let offset_after = frame.planar_offset(normalized * scale_after);
+                let correction = offset_before - offset_after;
+                camera.target_anchor += correction;
             }
         }
     }
@@ -326,11 +462,15 @@ fn scroll_zoom_system(
 
 fn edge_scroll_system(
     time: Res<Time>,
-    windows: Query<&Window, With<PrimaryWindow>>,
+    windows: Query<&Window>,
+    primary_window: Query<Entity, With<bevy::window::PrimaryWindow>>,
     mut cameras: Query<(
         &TopDownCameraInput,
+        &TopDownCameraInputPolicy,
         &TopDownCameraSettings,
         &TopDownCameraRuntime,
+        &Camera,
+        Option<&RenderTarget>,
         &mut TopDownCamera,
     )>,
 ) {
@@ -339,17 +479,11 @@ fn edge_scroll_system(
         return;
     }
 
-    let Ok(window) = windows.single() else {
-        return;
-    };
-    let Some(cursor_pos) = window.cursor_position() else {
-        return;
-    };
+    let primary_window = primary_window.single().ok();
 
-    let width = window.width();
-    let height = window.height();
-
-    for (input, settings, runtime, mut camera) in &mut cameras {
+    for (input, policy, settings, runtime, camera_component, render_target, mut camera) in
+        &mut cameras
+    {
         if !input.edge_scroll_enabled {
             continue;
         }
@@ -359,23 +493,35 @@ fn edge_scroll_system(
             continue;
         }
 
+        let Some((cursor_pos, viewport_size)) =
+            cursor_in_viewport(camera_component, render_target, &windows, primary_window)
+        else {
+            continue;
+        };
+
+        if !matches_pointer_target(
+            policy,
+            camera_component,
+            render_target,
+            &windows,
+            primary_window,
+        ) {
+            continue;
+        }
+
         let mut direction = Vec2::ZERO;
 
-        // Right edge
-        if cursor_pos.x > width - margin {
-            direction.x += ((cursor_pos.x - (width - margin)) / margin).clamp(0.0, 1.0);
+        if cursor_pos.x > viewport_size.x - margin {
+            direction.x += ((cursor_pos.x - (viewport_size.x - margin)) / margin).clamp(0.0, 1.0);
         }
-        // Left edge
         if cursor_pos.x < margin {
             direction.x -= ((margin - cursor_pos.x) / margin).clamp(0.0, 1.0);
         }
-        // Top edge (screen Y=0 is top)
         if cursor_pos.y < margin {
             direction.y += ((margin - cursor_pos.y) / margin).clamp(0.0, 1.0);
         }
-        // Bottom edge
-        if cursor_pos.y > height - margin {
-            direction.y -= ((cursor_pos.y - (height - margin)) / margin).clamp(0.0, 1.0);
+        if cursor_pos.y > viewport_size.y - margin {
+            direction.y -= ((cursor_pos.y - (viewport_size.y - margin)) / margin).clamp(0.0, 1.0);
         }
 
         if direction == Vec2::ZERO {
@@ -396,26 +542,38 @@ fn edge_scroll_system(
 fn keyboard_rotate_system(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
-    mut cameras: Query<(&TopDownCameraInput, &mut TopDownCamera)>,
+    windows: Query<&Window>,
+    primary_window: Query<Entity, With<bevy::window::PrimaryWindow>>,
+    mut cameras: Query<(
+        &TopDownCameraInput,
+        &TopDownCameraInputPolicy,
+        &Camera,
+        Option<&RenderTarget>,
+        &mut TopDownCamera,
+    )>,
 ) {
     let dt = time.delta_secs();
     if dt <= 0.0 {
         return;
     }
 
-    for (input, mut camera) in &mut cameras {
+    let primary_window = primary_window.single().ok();
+
+    for (input, policy, camera_component, render_target, mut camera) in &mut cameras {
         if !input.keyboard_rotate_enabled {
             continue;
         }
-
-        let mut rotation = 0.0;
-        if keys.pressed(KeyCode::KeyQ) {
-            rotation -= 1.0;
+        if !matches_keyboard_target(
+            policy,
+            camera_component,
+            render_target,
+            &windows,
+            primary_window,
+        ) {
+            continue;
         }
-        if keys.pressed(KeyCode::KeyE) {
-            rotation += 1.0;
-        }
 
+        let rotation = policy.bindings.keyboard_rotate(&keys);
         if rotation != 0.0 {
             camera.target_yaw += rotation * input.keyboard_rotate_speed * dt;
         }
@@ -425,9 +583,14 @@ fn keyboard_rotate_system(
 fn keyboard_zoom_system(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
+    windows: Query<&Window>,
+    primary_window: Query<Entity, With<bevy::window::PrimaryWindow>>,
     mut cameras: Query<(
         &TopDownCameraInput,
+        &TopDownCameraInputPolicy,
         &TopDownCameraSettings,
+        &Camera,
+        Option<&RenderTarget>,
         &mut TopDownCamera,
     )>,
 ) {
@@ -436,23 +599,129 @@ fn keyboard_zoom_system(
         return;
     }
 
-    for (input, settings, mut camera) in &mut cameras {
+    let primary_window = primary_window.single().ok();
+
+    for (input, policy, settings, camera_component, render_target, mut camera) in &mut cameras {
         if !input.keyboard_zoom_enabled {
             continue;
         }
-
-        let mut zoom_dir = 0.0;
-        if keys.pressed(KeyCode::Equal) || keys.pressed(KeyCode::NumpadAdd) {
-            zoom_dir -= 1.0;
+        if !matches_keyboard_target(
+            policy,
+            camera_component,
+            render_target,
+            &windows,
+            primary_window,
+        ) {
+            continue;
         }
-        if keys.pressed(KeyCode::Minus) || keys.pressed(KeyCode::NumpadSubtract) {
-            zoom_dir += 1.0;
-        }
 
+        let zoom_dir = policy.bindings.keyboard_zoom(&keys);
         if zoom_dir != 0.0 {
             camera.zoom += zoom_dir * input.keyboard_zoom_speed * dt;
             camera.zoom = camera.zoom.clamp(settings.zoom_min, settings.zoom_max);
         }
+    }
+}
+
+fn matches_keyboard_target(
+    policy: &TopDownCameraInputPolicy,
+    camera: &Camera,
+    render_target: Option<&RenderTarget>,
+    windows: &Query<&Window>,
+    primary_window: Option<Entity>,
+) -> bool {
+    matches_input_target(
+        policy.target_filter,
+        camera,
+        render_target,
+        windows,
+        primary_window,
+        false,
+    )
+}
+
+fn matches_pointer_target(
+    policy: &TopDownCameraInputPolicy,
+    camera: &Camera,
+    render_target: Option<&RenderTarget>,
+    windows: &Query<&Window>,
+    primary_window: Option<Entity>,
+) -> bool {
+    matches_input_target(
+        policy.target_filter,
+        camera,
+        render_target,
+        windows,
+        primary_window,
+        true,
+    )
+}
+
+fn matches_input_target(
+    filter: TopDownCameraInputTargetFilter,
+    camera: &Camera,
+    render_target: Option<&RenderTarget>,
+    windows: &Query<&Window>,
+    primary_window: Option<Entity>,
+    require_cursor_in_viewport: bool,
+) -> bool {
+    if !matches!(filter, TopDownCameraInputTargetFilter::AnyCamera) && !camera.is_active {
+        return false;
+    }
+
+    let window_entity = camera_window_entity(render_target, primary_window);
+    if let Some(window_entity) = window_entity {
+        let Ok(window) = windows.get(window_entity) else {
+            return false;
+        };
+        if !matches!(filter, TopDownCameraInputTargetFilter::AnyCamera) && !window.focused {
+            return false;
+        }
+    }
+
+    if require_cursor_in_viewport
+        || matches!(filter, TopDownCameraInputTargetFilter::ActiveViewport)
+    {
+        return cursor_in_viewport(camera, render_target, windows, primary_window).is_some();
+    }
+
+    true
+}
+
+fn cursor_in_viewport(
+    camera: &Camera,
+    render_target: Option<&RenderTarget>,
+    windows: &Query<&Window>,
+    primary_window: Option<Entity>,
+) -> Option<(Vec2, Vec2)> {
+    let window_entity = camera_window_entity(render_target, primary_window)?;
+    let window = windows.get(window_entity).ok()?;
+    let cursor_position = window.cursor_position()?;
+    let viewport = camera.logical_viewport_rect()?;
+    let viewport_size = viewport.size();
+    let viewport_cursor = cursor_position - viewport.min;
+
+    if viewport_cursor.x < 0.0
+        || viewport_cursor.y < 0.0
+        || viewport_cursor.x > viewport_size.x
+        || viewport_cursor.y > viewport_size.y
+    {
+        return None;
+    }
+
+    Some((viewport_cursor, viewport_size))
+}
+
+fn camera_window_entity(
+    render_target: Option<&RenderTarget>,
+    primary_window: Option<Entity>,
+) -> Option<Entity> {
+    let render_target = render_target?;
+
+    match render_target {
+        RenderTarget::Window(WindowRef::Primary) => primary_window,
+        RenderTarget::Window(WindowRef::Entity(entity)) => Some(*entity),
+        _ => None,
     }
 }
 
