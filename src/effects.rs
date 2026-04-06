@@ -208,8 +208,10 @@ pub(crate) fn compose_effects(
 
         runtime.render_anchor = runtime.follow_anchor + stack.anchor_offset;
         runtime.render_yaw = runtime.yaw + stack.yaw_delta;
-        runtime.render_zoom = (runtime.zoom + stack.zoom_delta)
-            .clamp(settings.zoom_min.min(settings.zoom_max), settings.zoom_max.max(settings.zoom_min));
+        runtime.render_zoom = (runtime.zoom + stack.zoom_delta).clamp(
+            settings.zoom_min.min(settings.zoom_max),
+            settings.zoom_max.max(settings.zoom_min),
+        );
         runtime.render_fov_delta = stack.fov_delta;
     }
 }
