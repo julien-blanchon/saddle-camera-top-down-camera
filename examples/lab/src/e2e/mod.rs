@@ -265,10 +265,18 @@ fn build_runtime_smoke() -> Scenario {
     Scenario::builder("top_down_camera_smoke")
         .description("Verify the lab camera has valid runtime state, dump the runtime component, and capture a crate-specific smoke screenshot.")
         .then(Action::WaitFrames(90))
+        .then(assertions::entity_exists::<TopDownCamera>(
+            "camera entity exists",
+        ))
+        .then(assertions::entity_count::<TopDownCameraTarget>(
+            "two camera targets exist",
+            2,
+        ))
         .then(assertions::component_satisfies::<TopDownCameraRuntime>(
             "runtime has a tracked point and valid zoom",
             |runtime| runtime.zoom > 0.0 && runtime.tracked_point.is_finite(),
         ))
+        .then(inspect::log_world_summary("top_down_camera_smoke world"))
         .then(assertions::log_summary("top_down_camera_smoke summary"))
         .then(inspect::dump_component_json::<TopDownCameraRuntime>(
             "top_down_camera_smoke_runtime",
@@ -507,7 +515,9 @@ fn reconfigure_camera(
     world.insert_resource(crate::LabDefaultsOverridden);
 
     // Update the pane to match so sync_example_pane doesn't override our values
-    if let Some(mut pane) = world.get_resource_mut::<saddle_camera_top_down_camera_example_common::ExampleTopDownPane>() {
+    if let Some(mut pane) =
+        world.get_resource_mut::<saddle_camera_top_down_camera_example_common::ExampleTopDownPane>()
+    {
         pane.follow_enabled = follow_enabled;
         pane.dead_zone_x = settings.dead_zone.x;
         pane.dead_zone_y = settings.dead_zone.y;
@@ -576,7 +586,9 @@ fn follow_validation_sequence(
             store_baseline(world);
         })),
         Action::Screenshot(before_name),
-        Action::Log(format!("[{name}] baseline stored, moving target to {move_to:?}")),
+        Action::Log(format!(
+            "[{name}] baseline stored, moving target to {move_to:?}"
+        )),
         Action::Custom(Box::new(move |world: &mut World| {
             teleport_primary(world, move_to);
         })),
@@ -586,8 +598,13 @@ fn follow_validation_sequence(
             if let Some(rt) = runtime(world) {
                 info!(
                     "[{name}] follow_anchor={:?} goal_anchor={:?} tracked_point={:?} render_anchor={:?} zoom={:.2} yaw={:.2} active_target={:?}",
-                    rt.follow_anchor, rt.goal_anchor, rt.tracked_point,
-                    rt.render_anchor, rt.zoom, rt.yaw, rt.active_target
+                    rt.follow_anchor,
+                    rt.goal_anchor,
+                    rt.tracked_point,
+                    rt.render_anchor,
+                    rt.zoom,
+                    rt.yaw,
+                    rt.active_target
                 );
             }
         })),
@@ -642,10 +659,13 @@ fn build_example_basic_2d() -> Scenario {
             1.0,
             true,
         );
-        configure_primary_target(world, TopDownCameraTarget {
-            priority: 10,
-            ..default()
-        });
+        configure_primary_target(
+            world,
+            TopDownCameraTarget {
+                priority: 10,
+                ..default()
+            },
+        );
         teleport_primary(world, Vec3::new(0.0, 0.0, 0.0));
     })));
     for action in follow_validation_sequence("example_basic_2d", Vec3::new(300.0, 200.0, 0.0), 20.0)
@@ -683,20 +703,19 @@ fn build_example_basic_3d() -> Scenario {
             16.0,
             true,
         );
-        configure_primary_target(world, TopDownCameraTarget {
-            priority: 10,
-            anchor_offset: Vec3::Y * 0.75,
-            look_ahead_time: Vec2::splat(0.15),
-            max_look_ahead: Vec2::splat(1.2),
-            ..default()
-        });
+        configure_primary_target(
+            world,
+            TopDownCameraTarget {
+                priority: 10,
+                anchor_offset: Vec3::Y * 0.75,
+                look_ahead_time: Vec2::splat(0.15),
+                max_look_ahead: Vec2::splat(1.2),
+                ..default()
+            },
+        );
         teleport_primary(world, Vec3::new(0.0, 0.75, 0.0));
     })));
-    for action in follow_validation_sequence(
-        "example_basic_3d",
-        Vec3::new(10.0, 0.75, 8.0),
-        2.0,
-    ) {
+    for action in follow_validation_sequence("example_basic_3d", Vec3::new(10.0, 0.75, 8.0), 2.0) {
         builder = builder.then(action);
     }
     builder.build()
@@ -729,10 +748,13 @@ fn build_example_bounds() -> Scenario {
             1.0,
             true,
         );
-        configure_primary_target(world, TopDownCameraTarget {
-            priority: 10,
-            ..default()
-        });
+        configure_primary_target(
+            world,
+            TopDownCameraTarget {
+                priority: 10,
+                ..default()
+            },
+        );
         teleport_primary(world, Vec3::new(0.0, 0.0, 0.0));
     })));
     // Move target past bounds
@@ -785,18 +807,19 @@ fn build_example_target_switching() -> Scenario {
             14.0,
             true,
         );
-        configure_primary_target(world, TopDownCameraTarget {
-            priority: 10,
-            anchor_offset: Vec3::Y * 0.75,
-            ..default()
-        });
+        configure_primary_target(
+            world,
+            TopDownCameraTarget {
+                priority: 10,
+                anchor_offset: Vec3::Y * 0.75,
+                ..default()
+            },
+        );
         teleport_primary(world, Vec3::new(-5.0, 0.75, -3.0));
     })));
-    for action in follow_validation_sequence(
-        "example_target_switching",
-        Vec3::new(8.0, 0.75, 6.0),
-        2.0,
-    ) {
+    for action in
+        follow_validation_sequence("example_target_switching", Vec3::new(8.0, 0.75, 6.0), 2.0)
+    {
         builder = builder.then(action);
     }
     builder.build()
@@ -825,10 +848,13 @@ fn build_example_soft_zone_framing() -> Scenario {
             1.0,
             true,
         );
-        configure_primary_target(world, TopDownCameraTarget {
-            priority: 10,
-            ..default()
-        });
+        configure_primary_target(
+            world,
+            TopDownCameraTarget {
+                priority: 10,
+                ..default()
+            },
+        );
         teleport_primary(world, Vec3::new(0.0, 0.0, 0.0));
     })));
     for action in follow_validation_sequence(
@@ -863,11 +889,14 @@ fn build_example_optional_controls() -> Scenario {
             16.0,
             true,
         );
-        configure_primary_target(world, TopDownCameraTarget {
-            priority: 10,
-            anchor_offset: Vec3::Y * 0.75,
-            ..default()
-        });
+        configure_primary_target(
+            world,
+            TopDownCameraTarget {
+                priority: 10,
+                anchor_offset: Vec3::Y * 0.75,
+                ..default()
+            },
+        );
         // Target starts offset from camera — matches the example's initial state
         teleport_primary(world, Vec3::new(-4.0, 0.75, 0.0));
     })));
@@ -882,7 +911,9 @@ fn build_example_optional_controls() -> Scenario {
             );
         }
     })));
-    builder = builder.then(Action::Screenshot("example_optional_controls_initial".into()));
+    builder = builder.then(Action::Screenshot(
+        "example_optional_controls_initial".into(),
+    ));
     // Now move the target significantly
     builder = builder.then(Action::Custom(Box::new(|world: &mut World| {
         store_baseline(world);
@@ -923,11 +954,14 @@ fn build_example_strategy_game() -> Scenario {
             14.0,
             false, // follow disabled!
         );
-        configure_primary_target(world, TopDownCameraTarget {
-            priority: 1,
-            anchor_offset: Vec3::Y * 0.75,
-            ..default()
-        });
+        configure_primary_target(
+            world,
+            TopDownCameraTarget {
+                priority: 1,
+                anchor_offset: Vec3::Y * 0.75,
+                ..default()
+            },
+        );
         teleport_primary(world, Vec3::new(0.0, 0.75, 0.0));
     })));
     builder = builder.then(Action::WaitFrames(30));
@@ -990,20 +1024,20 @@ fn build_example_arpg_camera() -> Scenario {
             16.0,
             true,
         );
-        configure_primary_target(world, TopDownCameraTarget {
-            priority: 10,
-            anchor_offset: Vec3::Y * 0.75,
-            look_ahead_time: Vec2::new(0.15, 0.15),
-            max_look_ahead: Vec2::splat(3.0),
-            ..default()
-        });
+        configure_primary_target(
+            world,
+            TopDownCameraTarget {
+                priority: 10,
+                anchor_offset: Vec3::Y * 0.75,
+                look_ahead_time: Vec2::new(0.15, 0.15),
+                max_look_ahead: Vec2::splat(3.0),
+                ..default()
+            },
+        );
         teleport_primary(world, Vec3::new(0.0, 0.75, 0.0));
     })));
-    for action in follow_validation_sequence(
-        "example_arpg_camera",
-        Vec3::new(6.0, 0.75, -5.0),
-        1.5,
-    ) {
+    for action in follow_validation_sequence("example_arpg_camera", Vec3::new(6.0, 0.75, -5.0), 1.5)
+    {
         builder = builder.then(action);
     }
     builder.build()
